@@ -1,6 +1,6 @@
 # Basic Ollama Streamlit app
 
-This shows a super simple Pythons server using Streamlit to create a chatbot.
+This shows a super simple Python LLM chatbot. It uses Ollama to run LLMs locally and Streamlit to create the chatbot user interface.
 
 ![](./images/chat-screenshot.png)
 
@@ -36,14 +36,14 @@ ollama pull codegemma:7b
 ollama pull phi4
 ```
 
-The Ollama README has a list of [other available models](https://ollama.com/search)
+The Ollama site has a list of [other available models](https://ollama.com/search)
 
 I follow the guidance in the ollama Github README:
 
 > [!NOTE]
 > You should have at least 8 GB of RAM available to run the 7B models, 16 GB to run the 13B models, and 32 GB to run the 33B models.
 
-### Python environment
+### Run the python chatbot user interface
 
 I tried out [uv](https://docs.astral.sh/uv/) in this project.
 
