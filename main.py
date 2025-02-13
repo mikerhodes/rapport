@@ -77,26 +77,27 @@ def clear_chat():
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
 
-    try:
-        # First allow the model to call tools we've defined.
-        response = ollama.chat(
-            model=st.session_state["model"],
-            messages=st.session_state["messages"],
-            tools=[tool_get_current_weather, add_two_numbers, subtract_two_numbers], # Actual function reference
-            stream=False,
-        )
-        for tool in response.message.tool_calls or []:
-            function_to_call = available_functions.get(tool.function.name)
-            if function_to_call:
-                output = function_to_call(**tool.function.arguments)
-                print('Function output:', output)
-                st.session_state["messages"].append({'role': 'tool', 'content': str(output), 'name': tool.function.name})
-            else:
-                print('Function not found:', tool.function.name)
-    except:
-        print("Model doesn't support tools")
+    if use_tools:
+        try:
+            # First allow the model to call tools we've defined.
+            response = ollama.chat(
+                model=st.session_state["model"],
+                messages=st.session_state["messages"],
+                tools=[tool_get_current_weather, add_two_numbers, subtract_two_numbers], # Actual function reference
+                stream=False,
+            )
+            for tool in response.message.tool_calls or []:
+                function_to_call = available_functions.get(tool.function.name)
+                if function_to_call:
+                    output = function_to_call(**tool.function.arguments)
+                    print('Function output:', output)
+                    st.session_state["messages"].append({'role': 'tool', 'content': str(output), 'name': tool.function.name})
+                else:
+                    print('Function not found:', tool.function.name)
+        except:
+            print("Model doesn't support tools")
 
-    print(st.session_state["messages"])
+        print(st.session_state["messages"])
 
     response = ollama.chat(
         model=st.session_state["model"],
@@ -116,6 +117,7 @@ st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:")
 with st.sidebar:
     "## Configuration"
     st.selectbox("Choose your model", models, key="model")
+    use_tools = st.toggle("Use tools")
     "## Ollama Python Chatbot"
     st.button("New Chat", on_click=clear_chat)
     "## Summarise a file"
