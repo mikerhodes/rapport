@@ -5,15 +5,31 @@ from textwrap import dedent
 import ollama
 import streamlit as st
 
+from chathistory import ChatHistoryManager
+
 PREFERRED_MODEL = "phi4:latest"
 
 # 
 # initialize state
 # 
 
+# Initialize the chat history manager
+if "history_manager" not in st.session_state:
+    st.session_state["history_manager"] = ChatHistoryManager()
+
+with open("systemprompt.md", "r") as file:
+    system_prompt = file.read()
+SYSTEM = {
+    "role": "system",
+    "content": system_prompt,
+}
+
 # Message history
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state["messages"] = [SYSTEM]
+
+if "current_chat_id" not in st.session_state:
+    st.session_state["current_chat_id"] = None
 
 # Retrieve the current models from ollama
 # Set a preferred model as default if there's none set
@@ -71,7 +87,8 @@ available_functions = {
 
 def clear_chat():
     """Clears the existing chat session"""
-    st.session_state["messages"] = []
+    st.session_state["messages"] = [SYSTEM]
+    st.session_state["current_chat_id"] = None
     st.success('Chat cleared!', icon="✅")
 
 def stream_model_response():
@@ -108,10 +125,57 @@ def stream_model_response():
     for chunk in response:
         yield chunk["message"]["content"]
 
+def generate_chat_title():
+    """Generate a title from the first 6 words of the first user message"""
+    # Find first user message
+    user_messages = [msg for msg in st.session_state["messages"] if msg["role"] == "user"]
+    if not user_messages:
+        return "New Chat"
+    
+    # Take first 6 words of first message
+    first_message = user_messages[0]["content"]
+    words = first_message.split()[:6]
+    title = " ".join(words)
+    
+    # Add ellipsis if we truncated the message
+    if len(words) < len(first_message.split()):
+        title += "..."
+        
+    return title
+
+def save_current_chat():
+    """Save the current chat session"""
+    if len(st.session_state["messages"]) > 1:  # More than just system message
+        title = generate_chat_title()
+        chat_id = st.session_state["history_manager"].save_chat(
+            st.session_state["messages"],
+            title,
+            st.session_state["model"],
+            st.session_state["current_chat_id"]
+        )
+        st.session_state["current_chat_id"] = chat_id
+        st.success("Chat saved successfully!", icon="✅")
+    else:
+        st.warning("Nothing to save - chat is empty!", icon="⚠️")
+
+def load_chat(chat_id):
+    """Load a chat from history"""
+    chat = st.session_state["history_manager"].get_chat(chat_id)
+    if chat:
+        st.session_state["messages"] = chat["messages"]
+        st.session_state["model"] = chat["model"]
+        st.session_state["current_chat_id"] = chat_id
+
+def delete_chat(chat_id):
+    st.session_state["history_manager"].delete_chat(chat_id)
+    if chat_id == st.session_state["current_chat_id"]:
+        clear_chat()
+
+
 #
 # Start rendering the app
 #
-#
+
 st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:")
 
 with st.sidebar:
@@ -119,12 +183,37 @@ with st.sidebar:
     st.selectbox("Choose your model", models, key="model")
     use_tools = st.toggle("Use tools")
     "## Ollama Python Chatbot"
-    st.button("New Chat", on_click=clear_chat)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("New Chat", on_click=clear_chat)
+    with col2:
+        st.button("Save Chat", on_click=save_current_chat)
     "## Summarise a file"
     uploaded_file = st.file_uploader("Upload a plain text document")
     # summarise_detail = st.pills("Level of detail", ["Brief", "Detailed"], default="Brief")
     summarise_detailed = st.toggle("Detailed summary")
     summarise_document = st.button("Go")
+
+    # Display recent chats
+    st.markdown("## Recent Chats")
+    recent_chats = st.session_state["history_manager"].get_recent_chats()
+    
+    for chat in recent_chats:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            # Highlight current chat
+            title = chat['title']
+            if chat['id'] == st.session_state["current_chat_id"]:
+                title = f"📍 {title}"
+            st.button(title,
+                      key=f"chat_{chat['id']}",
+                      on_click=load_chat,
+                      args=[chat['id']])
+        with col2:
+            st.button("🗑️",
+                      key=f"delete_{chat['id']}",
+                      on_click=delete_chat,
+                      args=[chat['id']])
 
 
 # Display chat messages from history on app rerun
