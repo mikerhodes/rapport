@@ -125,6 +125,36 @@ def stream_model_response():
     for chunk in response:
         yield chunk["message"]["content"]
 
+def regenerate_last_response():
+    """Regenerate the last assistant response"""
+    # Remove the last assistant message
+    messages_without_last = st.session_state["messages"][:-1]
+    
+    # Generate new response
+    response = ollama.chat(
+        model=st.session_state["model"],
+        messages=messages_without_last,
+        stream=False,
+    )
+
+    # def stream_generator():
+    #     for chunk in response:
+    #         yield chunk["message"]["content"]
+            
+    # # Update the UI with the new response
+    # with st.chat_message("assistant"):
+    #     with st.spinner("Regenerating response...", show_time=False):
+    #         message = st.write_stream(stream_generator())
+    
+    # Update the messages list with the new response
+    st.session_state["messages"] = messages_without_last + [
+        {"role": "assistant", "content": response["message"]["content"]}
+    ]
+
+#
+# Chat history
+# 
+
 def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
@@ -283,3 +313,9 @@ if prompt := st.chat_input("Enter prompt here..."):
             # message = st.write_stream(stream_model_response())
             message = st.write_stream(stream_model_response())
         st.session_state["messages"].append({"role": "assistant", "content": message})
+        # Right-align regenerate button
+        left, right = st.columns([3, 1])
+        with right:
+            st.button("🔄 Regenerate",
+                      key="regenerate",
+                      on_click=regenerate_last_response)
