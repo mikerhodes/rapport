@@ -38,50 +38,6 @@ if "model" not in st.session_state and PREFERRED_MODEL in models:
     st.session_state["model"] = PREFERRED_MODEL
 
 #
-# Tools
-#
-
-def tool_get_current_weather(location: str, format: str) -> str:
-    """
-    Get the current weather for a location (eg, a city).
-
-    Args:
-        location: a city name
-        format: celcius or fahrenheit
-
-    Returns:
-        str: a string describing the weather in the location
-    """
-    temp = random.randint(40, 90) if format == 'fahrenheit' else random.randint(10, 25)
-    return f"It's {temp} degrees {format} in {location} today."
-
-def add_two_numbers(a: int, b: int) -> int:
-  """
-  Add two numbers
-
-  Args:
-    a (int): The first number
-    b (int): The second number
-
-  Returns:
-    int: The sum of the two numbers
-  """
-  return a + b
-
-
-def subtract_two_numbers(a: int, b: int) -> int:
-  """
-  Subtract two numbers
-  """
-  return a - b
-
-available_functions = {
-    "tool_get_current_weather": tool_get_current_weather,
-    'add_two_numbers': add_two_numbers,
-    'subtract_two_numbers': subtract_two_numbers,
-}
-
-#
 # Helpers
 #
 
@@ -93,35 +49,11 @@ def clear_chat():
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
-
-    if use_tools:
-        try:
-            # First allow the model to call tools we've defined.
-            response = ollama.chat(
-                model=st.session_state["model"],
-                messages=st.session_state["messages"],
-                tools=[tool_get_current_weather, add_two_numbers, subtract_two_numbers], # Actual function reference
-                stream=False,
-            )
-            for tool in response.message.tool_calls or []:
-                function_to_call = available_functions.get(tool.function.name)
-                if function_to_call:
-                    output = function_to_call(**tool.function.arguments)
-                    print('Function output:', output)
-                    st.session_state["messages"].append({'role': 'tool', 'content': str(output), 'name': tool.function.name})
-                else:
-                    print('Function not found:', tool.function.name)
-        except:
-            print("Model doesn't support tools")
-
-        print(st.session_state["messages"])
-
     response = ollama.chat(
         model=st.session_state["model"],
         messages=st.session_state["messages"],
         stream=True,
     )
-
     for chunk in response:
         yield chunk["message"]["content"]
 
@@ -211,7 +143,6 @@ st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:")
 with st.sidebar:
     "## Configuration"
     st.selectbox("Choose your model", models, key="model")
-    use_tools = st.toggle("Use tools")
     "## Ollama Python Chatbot"
     col1, col2 = st.columns(2)
     with col1:
