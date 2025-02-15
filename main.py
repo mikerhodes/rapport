@@ -132,7 +132,7 @@ def delete_chat(chat_id):
 # Start rendering the app
 #
 
-st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:")
+st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:", layout="wide")
 
 with st.sidebar:
     "## Configuration"
@@ -143,12 +143,6 @@ with st.sidebar:
         st.button("New Chat", on_click=clear_chat)
     with col2:
         st.button("Save Chat", on_click=save_current_chat)
-    "## Summarise a file"
-    uploaded_file = st.file_uploader("Upload a plain text document")
-    # summarise_detail = st.pills("Level of detail", ["Brief", "Detailed"], default="Brief")
-    summarise_detailed = st.toggle("Detailed summary")
-    summarise_document = st.button("Go")
-
     # Display recent chats
     st.markdown("## Recent Chats")
     recent_chats = st.session_state["history_manager"].get_recent_chats()
@@ -168,30 +162,41 @@ with st.sidebar:
                 "🗑️", key=f"delete_{chat['id']}", on_click=delete_chat, args=[chat["id"]]
             )
 
+chat_col, col2 = st.columns([3, 1])
+with chat_col:
+    # Display chat messages from history on app rerun
+    for message in st.session_state["messages"]:
+        if message["role"] == "system":
+            with st.expander("View system prompt"):
+                st.markdown(message["content"])
+        else:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+with col2:
+    uploaded_file = st.file_uploader("Upload a plain text document")
+    summarise_code = st.toggle("Upload is code")
+    st.button("Go", key="summarise_document")
 
-# Display chat messages from history on app rerun
-for message in st.session_state["messages"]:
-    if message["role"] == "system":
-        with st.expander("View system prompt"):
-            st.markdown(message["content"])
-    else:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
 
-
-if summarise_document and uploaded_file is not None:
-    if summarise_detailed:
+if st.session_state["summarise_document"] and uploaded_file is not None:
+    if summarise_code:
         prompt = dedent("""
-            1. Analyze the input text and generate 5 essential questions that, when answered, capture the main points and core meaning of the text.
-            2. When formulating your questions:
-                1. Address the central theme or argument
-                2. Identify key supporting ideas
-                3. Highlight important facts or evidence
-                4. Reveal the author's purpose or perspective
-                5. Explore any significant implications or conclusions.
-            3. Answer all of your generated questions one-by-one in detail.\n\n""")
+            Summarise this code as if you are writing documentation.
+
+            First, describe the overall purpose of the code. 
+
+            Next, highlight the key functions in the code and what they do.
+
+            Finally, if there are public functions, give examples of how to use them.
+            \n""")
     else:
-        prompt = "Condense the content into a bullet point summary, emphasizing the main conclusion and its immediate importance. Use a maximum of four bullet points."
+        prompt = dedent("""
+            Condense the content into a bullet point summary.
+
+            Emphasise the main conclusion and its immediate importance.
+
+            Use a maximum of ten bullet points.
+            \n""")
 
     stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
     string_data = stringio.read()
@@ -199,27 +204,32 @@ if summarise_document and uploaded_file is not None:
         "role": "user",
         "content": prompt + string_data,
     }
-    with st.chat_message("user"):
-        summarisation_request = f"Requested summarisation of `{uploaded_file.name}` using the following prompt:\n\n {prompt}"
-        st.markdown(summarisation_request)
-        st.session_state["messages"].append(
-            {"role": "user", "content": summarisation_request}
-        )
 
-    with st.chat_message("assistant"):
-
-        def stream_summary_response(file_data):
-            stream = ollama.chat(
-                model=st.session_state["model"],
-                messages=[user_query],
-                stream=True,
+    with chat_col:
+        # Don't paste the whole document into the chat
+        with st.chat_message("user"):
+            summarisation_request = f"Requested summarisation of `{uploaded_file.name}` using the following prompt:\n\n {prompt}"
+            st.markdown(summarisation_request)
+            st.session_state["messages"].append(
+                {"role": "user", "content": summarisation_request}
             )
-            for chunk in stream:
-                yield chunk["message"]["content"]
 
-        with st.spinner("Thinking...", show_time=False):
-            message = st.write_stream(stream_summary_response(string_data))
-        st.session_state["messages"].append({"role": "assistant", "content": message})
+        with st.chat_message("assistant"):
+
+            def stream_summary_response(file_data):
+                stream = ollama.chat(
+                    model=st.session_state["model"],
+                    messages=[user_query],
+                    stream=True,
+                )
+                for chunk in stream:
+                    yield chunk["message"]["content"]
+
+            with st.spinner("Thinking...", show_time=False):
+                message = st.write_stream(stream_summary_response(string_data))
+            st.session_state["messages"].append(
+                {"role": "assistant", "content": message}
+            )
 
 
 def handle_submit_prompt():
@@ -229,17 +239,20 @@ def handle_submit_prompt():
     st.session_state["generate_assistant"] = True
 
 
-st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
-
-if st.session_state["generate_assistant"]:
-    st.session_state["generate_assistant"] = False
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking...", show_time=False):
-            message = st.write_stream(stream_model_response())
-        st.session_state["messages"].append({"role": "assistant", "content": message})
-        # Right-align regenerate button
-        left, right = st.columns([3, 1])
-        with right:
-            st.button(
-                "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
+with chat_col:
+    if st.session_state["generate_assistant"]:
+        st.session_state["generate_assistant"] = False
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking...", show_time=False):
+                message = st.write_stream(stream_model_response())
+            st.session_state["messages"].append(
+                {"role": "assistant", "content": message}
             )
+            # Right-align regenerate button
+            left, right = st.columns([3, 1])
+            with right:
+                st.button(
+                    "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
+                )
+
+st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
