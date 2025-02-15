@@ -1,5 +1,4 @@
 from io import StringIO
-import random
 from textwrap import dedent
 
 import ollama
@@ -9,9 +8,9 @@ from chathistory import ChatHistoryManager
 
 PREFERRED_MODEL = "phi4:latest"
 
-# 
+#
 # initialize state
-# 
+#
 
 
 # Don't generate a chat message until the user has prompted
@@ -46,11 +45,13 @@ if "model" not in st.session_state and PREFERRED_MODEL in models:
 # Helpers
 #
 
+
 def clear_chat():
     """Clears the existing chat session"""
     st.session_state["messages"] = [SYSTEM]
     st.session_state["current_chat_id"] = None
-    st.success('Chat cleared!', icon="✅")
+    st.success("Chat cleared!", icon="✅")
+
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
@@ -62,33 +63,39 @@ def stream_model_response():
     for chunk in response:
         yield chunk["message"]["content"]
 
+
 def regenerate_last_response():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
     st.session_state["messages"] = st.session_state["messages"][:-1]
     st.session_state["generate_assistant"] = True
 
+
 #
 # Chat history
-# 
+#
+
 
 def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
-    user_messages = [msg for msg in st.session_state["messages"] if msg["role"] == "user"]
+    user_messages = [
+        msg for msg in st.session_state["messages"] if msg["role"] == "user"
+    ]
     if not user_messages:
         return "New Chat"
-    
+
     # Take first 6 words of first message
     first_message = user_messages[0]["content"]
     words = first_message.split()[:6]
     title = " ".join(words)
-    
+
     # Add ellipsis if we truncated the message
     if len(words) < len(first_message.split()):
         title += "..."
-        
+
     return title
+
 
 def save_current_chat():
     """Save the current chat session"""
@@ -98,12 +105,13 @@ def save_current_chat():
             st.session_state["messages"],
             title,
             st.session_state["model"],
-            st.session_state["current_chat_id"]
+            st.session_state["current_chat_id"],
         )
         st.session_state["current_chat_id"] = chat_id
         st.success("Chat saved successfully!", icon="✅")
     else:
         st.warning("Nothing to save - chat is empty!", icon="⚠️")
+
 
 def load_chat(chat_id):
     """Load a chat from history"""
@@ -112,6 +120,7 @@ def load_chat(chat_id):
         st.session_state["messages"] = chat["messages"]
         st.session_state["model"] = chat["model"]
         st.session_state["current_chat_id"] = chat_id
+
 
 def delete_chat(chat_id):
     st.session_state["history_manager"].delete_chat(chat_id)
@@ -143,31 +152,27 @@ with st.sidebar:
     # Display recent chats
     st.markdown("## Recent Chats")
     recent_chats = st.session_state["history_manager"].get_recent_chats()
-    
+
     for chat in recent_chats:
         col1, col2 = st.columns([4, 1])
         with col1:
             # Highlight current chat
-            title = chat['title']
-            if chat['id'] == st.session_state["current_chat_id"]:
+            title = chat["title"]
+            if chat["id"] == st.session_state["current_chat_id"]:
                 title = f"📍 {title}"
-            st.button(title,
-                      key=f"chat_{chat['id']}",
-                      on_click=load_chat,
-                      args=[chat['id']])
+            st.button(
+                title, key=f"chat_{chat['id']}", on_click=load_chat, args=[chat["id"]]
+            )
         with col2:
-            st.button("🗑️",
-                      key=f"delete_{chat['id']}",
-                      on_click=delete_chat,
-                      args=[chat['id']])
+            st.button(
+                "🗑️", key=f"delete_{chat['id']}", on_click=delete_chat, args=[chat["id"]]
+            )
 
 
 # Display chat messages from history on app rerun
 for message in st.session_state["messages"]:
     if message["role"] == "system":
-        with st.expander(
-            "View system prompt"
-        ):
+        with st.expander("View system prompt"):
             st.markdown(message["content"])
     else:
         with st.chat_message(message["role"]):
@@ -187,7 +192,7 @@ if summarise_document and uploaded_file is not None:
             3. Answer all of your generated questions one-by-one in detail.\n\n""")
     else:
         prompt = "Condense the content into a bullet point summary, emphasizing the main conclusion and its immediate importance. Use a maximum of four bullet points."
-    
+
     stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
     string_data = stringio.read()
     user_query = {
@@ -195,19 +200,18 @@ if summarise_document and uploaded_file is not None:
         "content": prompt + string_data,
     }
     with st.chat_message("user"):
-
         summarisation_request = f"Requested summarisation of `{uploaded_file.name}` using the following prompt:\n\n {prompt}"
         st.markdown(summarisation_request)
-        st.session_state["messages"].append({"role": "user", "content": summarisation_request})
+        st.session_state["messages"].append(
+            {"role": "user", "content": summarisation_request}
+        )
 
     with st.chat_message("assistant"):
 
         def stream_summary_response(file_data):
             stream = ollama.chat(
                 model=st.session_state["model"],
-                messages=[
-                        user_query
-                ],
+                messages=[user_query],
                 stream=True,
             )
             for chunk in stream:
@@ -217,15 +221,15 @@ if summarise_document and uploaded_file is not None:
             message = st.write_stream(stream_summary_response(string_data))
         st.session_state["messages"].append({"role": "assistant", "content": message})
 
+
 def handle_submit_prompt():
     # add latest message to history in format {role, content}
     prompt = st.session_state["user_prompt"]
     st.session_state["messages"].append({"role": "user", "content": prompt})
     st.session_state["generate_assistant"] = True
 
-st.chat_input("Enter prompt here...",
-              key="user_prompt",
-              on_submit=handle_submit_prompt)
+
+st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
 
 if st.session_state["generate_assistant"]:
     st.session_state["generate_assistant"] = False
@@ -236,6 +240,6 @@ if st.session_state["generate_assistant"]:
         # Right-align regenerate button
         left, right = st.columns([3, 1])
         with right:
-            st.button("🔄 Regenerate",
-                      key="regenerate",
-                      on_click=regenerate_last_response)
+            st.button(
+                "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
+            )
