@@ -59,6 +59,9 @@ def stream_model_response():
         model=st.session_state["model"],
         messages=st.session_state["messages"],
         stream=True,
+        options=ollama.Options(
+            num_ctx=8192,
+        ),
     )
     for chunk in response:
         yield chunk["message"]["content"]
@@ -69,6 +72,27 @@ def regenerate_last_response():
     # Remove the last assistant message
     st.session_state["messages"] = st.session_state["messages"][:-1]
     st.session_state["generate_assistant"] = True
+
+
+def handle_submit_prompt():
+    # add latest message to history in format {role, content}
+    prompt = st.session_state["user_prompt"]
+    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.session_state["generate_assistant"] = True
+
+
+def handle_add_doc_to_chat():
+    print(dir(uploaded_file))
+    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
+    string_data = stringio.read()
+    ext = uploaded_file.name.split(".")[-1]
+    prompt = f"Including content of file `{uploaded_file.name}` below:\n\n```{ext}\n{string_data}\n```"
+    st.session_state["messages"].append(
+        {
+            "role": "user",
+            "content": prompt,
+        }
+    )
 
 
 #
@@ -155,7 +179,11 @@ with st.sidebar:
             if chat["id"] == st.session_state["current_chat_id"]:
                 title = f"📍 {title}"
             st.button(
-                title, key=f"chat_{chat['id']}", on_click=load_chat, args=[chat["id"]]
+                title,
+                key=f"chat_{chat['id']}",
+                on_click=load_chat,
+                args=[chat["id"]],
+                use_container_width=True,
             )
         with col2:
             st.button(
@@ -163,6 +191,11 @@ with st.sidebar:
             )
 
 chat_col, col2 = st.columns([3, 1])
+
+with col2:
+    uploaded_file = st.file_uploader("Upload a plain text, markdown or code file")
+    st.button("Add to Chat", on_click=handle_add_doc_to_chat)
+
 with chat_col:
     # Display chat messages from history on app rerun
     for message in st.session_state["messages"]:
@@ -172,74 +205,8 @@ with chat_col:
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-with col2:
-    uploaded_file = st.file_uploader("Upload a plain text document")
-    summarise_code = st.toggle("Upload is code")
-    st.button("Go", key="summarise_document")
 
-
-if st.session_state["summarise_document"] and uploaded_file is not None:
-    if summarise_code:
-        prompt = dedent("""
-            Summarise this code as if you are writing documentation.
-
-            First, describe the overall purpose of the code. 
-
-            Next, highlight the key functions in the code and what they do.
-
-            Finally, if there are public functions, give examples of how to use them.
-            \n""")
-    else:
-        prompt = dedent("""
-            Condense the content into a bullet point summary.
-
-            Emphasise the main conclusion and its immediate importance.
-
-            Use a maximum of ten bullet points.
-            \n""")
-
-    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
-    string_data = stringio.read()
-    user_query = {
-        "role": "user",
-        "content": prompt + string_data,
-    }
-
-    with chat_col:
-        # Don't paste the whole document into the chat
-        with st.chat_message("user"):
-            summarisation_request = f"Requested summarisation of `{uploaded_file.name}` using the following prompt:\n\n {prompt}"
-            st.markdown(summarisation_request)
-            st.session_state["messages"].append(
-                {"role": "user", "content": summarisation_request}
-            )
-
-        with st.chat_message("assistant"):
-
-            def stream_summary_response(file_data):
-                stream = ollama.chat(
-                    model=st.session_state["model"],
-                    messages=[user_query],
-                    stream=True,
-                )
-                for chunk in stream:
-                    yield chunk["message"]["content"]
-
-            with st.spinner("Thinking...", show_time=False):
-                message = st.write_stream(stream_summary_response(string_data))
-            st.session_state["messages"].append(
-                {"role": "assistant", "content": message}
-            )
-
-
-def handle_submit_prompt():
-    # add latest message to history in format {role, content}
-    prompt = st.session_state["user_prompt"]
-    st.session_state["messages"].append({"role": "user", "content": prompt})
-    st.session_state["generate_assistant"] = True
-
-
-with chat_col:
+    # Generate a reply and add to history
     if st.session_state["generate_assistant"]:
         st.session_state["generate_assistant"] = False
         with st.chat_message("assistant"):
@@ -248,11 +215,13 @@ with chat_col:
             st.session_state["messages"].append(
                 {"role": "assistant", "content": message}
             )
-            # Right-align regenerate button
-            left, right = st.columns([3, 1])
-            with right:
-                st.button(
-                    "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
-                )
+
+    # Allow user to regenerate the last response.
+    if st.session_state["messages"][-1]["role"] == "assistant":
+        _, right = st.columns([3, 1])
+        with right:
+            st.button(
+                "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
+            )
 
 st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
