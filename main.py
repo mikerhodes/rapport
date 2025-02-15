@@ -54,7 +54,6 @@ def clear_chat():
     st.session_state["messages"] = [SYSTEM]
     st.session_state["current_chat_id"] = None
     st.session_state["used_tokens"] = 0
-    st.success("Chat cleared!", icon="✅")
 
 
 def stream_model_response():
