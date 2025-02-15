@@ -13,6 +13,11 @@ PREFERRED_MODEL = "phi4:latest"
 # initialize state
 # 
 
+
+# Don't generate a chat message until the user has prompted
+if "generate_assistant" not in st.session_state:
+    st.session_state["generate_assistant"] = False
+
 # Initialize the chat history manager
 if "history_manager" not in st.session_state:
     st.session_state["history_manager"] = ChatHistoryManager()
@@ -60,28 +65,8 @@ def stream_model_response():
 def regenerate_last_response():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
-    messages_without_last = st.session_state["messages"][:-1]
-    
-    # Generate new response
-    response = ollama.chat(
-        model=st.session_state["model"],
-        messages=messages_without_last,
-        stream=False,
-    )
-
-    # def stream_generator():
-    #     for chunk in response:
-    #         yield chunk["message"]["content"]
-            
-    # # Update the UI with the new response
-    # with st.chat_message("assistant"):
-    #     with st.spinner("Regenerating response...", show_time=False):
-    #         message = st.write_stream(stream_generator())
-    
-    # Update the messages list with the new response
-    st.session_state["messages"] = messages_without_last + [
-        {"role": "assistant", "content": response["message"]["content"]}
-    ]
+    st.session_state["messages"] = st.session_state["messages"][:-1]
+    st.session_state["generate_assistant"] = True
 
 #
 # Chat history
@@ -232,16 +217,20 @@ if summarise_document and uploaded_file is not None:
             message = st.write_stream(stream_summary_response(string_data))
         st.session_state["messages"].append({"role": "assistant", "content": message})
 
-if prompt := st.chat_input("Enter prompt here..."):
+def handle_submit_prompt():
     # add latest message to history in format {role, content}
+    prompt = st.session_state["user_prompt"]
     st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.session_state["generate_assistant"] = True
 
-    with st.chat_message("user"):
-        st.markdown(prompt)
+st.chat_input("Enter prompt here...",
+              key="user_prompt",
+              on_submit=handle_submit_prompt)
 
+if st.session_state["generate_assistant"]:
+    st.session_state["generate_assistant"] = False
     with st.chat_message("assistant"):
         with st.spinner("Thinking...", show_time=False):
-            # message = st.write_stream(stream_model_response())
             message = st.write_stream(stream_model_response())
         st.session_state["messages"].append({"role": "assistant", "content": message})
         # Right-align regenerate button
