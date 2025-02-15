@@ -1,5 +1,4 @@
 from io import StringIO
-from textwrap import dedent
 
 import ollama
 import streamlit as st
@@ -20,6 +19,10 @@ if "generate_assistant" not in st.session_state:
 # Initialize the chat history manager
 if "history_manager" not in st.session_state:
     st.session_state["history_manager"] = ChatHistoryManager()
+
+# Store the tokens used in the prompt
+if "used_tokens" not in st.session_state:
+    st.session_state["used_tokens"] = 0
 
 with open("systemprompt.md", "r") as file:
     system_prompt = file.read()
@@ -50,20 +53,26 @@ def clear_chat():
     """Clears the existing chat session"""
     st.session_state["messages"] = [SYSTEM]
     st.session_state["current_chat_id"] = None
+    st.session_state["used_tokens"] = 0
     st.success("Chat cleared!", icon="✅")
 
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
+    m = ollama.show(st.session_state["model"])
+    model_context_length = m.modelinfo[f"{m.details.family}.context_length"]
+    print(m.details.family, model_context_length)
     response = ollama.chat(
         model=st.session_state["model"],
         messages=st.session_state["messages"],
         stream=True,
         options=ollama.Options(
-            num_ctx=8192,
+            num_ctx=min(8192, model_context_length),
         ),
     )
-    for chunk in response:
+    for chunk in response:  # prompt eval count is the token count used from the model
+        if chunk.prompt_eval_count is not None:
+            st.session_state["used_tokens"] = chunk.prompt_eval_count + chunk.eval_count
         yield chunk["message"]["content"]
 
 
@@ -167,6 +176,9 @@ with st.sidebar:
         st.button("New Chat", on_click=clear_chat)
     with col2:
         st.button("Save Chat", on_click=save_current_chat)
+
+    used_tokens_holder = st.empty()
+    used_tokens_holder.write(f"Used tokens: {st.session_state['used_tokens']}")
     # Display recent chats
     st.markdown("## Recent Chats")
     recent_chats = st.session_state["history_manager"].get_recent_chats()
@@ -225,3 +237,7 @@ with chat_col:
             )
 
 st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
+
+# Update the used tokens with the latest value after
+# generating a new response.
+used_tokens_holder.write(f"Used tokens: {st.session_state['used_tokens']}")
