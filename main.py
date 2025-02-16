@@ -176,8 +176,6 @@ with st.sidebar:
     with col2:
         st.button("Save Chat", on_click=save_current_chat)
 
-    used_tokens_holder = st.empty()
-    used_tokens_holder.write(f"Used tokens: {st.session_state['used_tokens']}")
     # Display recent chats
     st.markdown("## Recent Chats")
     recent_chats = st.session_state["history_manager"].get_recent_chats()
@@ -229,14 +227,22 @@ with chat_col:
 
     # Allow user to regenerate the last response.
     if st.session_state["messages"][-1]["role"] == "assistant":
-        _, right = st.columns([3, 1])
+        left, right = st.columns([3, 1])
+        with left:
+            used_tokens_holder = st.empty()
+            used_tokens_holder.caption(
+                f"Used tokens: {st.session_state['used_tokens']}"
+            )
         with right:
             st.button(
-                "🔄 Regenerate", key="regenerate", on_click=regenerate_last_response
+                "🔄 Regenerate",
+                key="regenerate",
+                on_click=regenerate_last_response,
+                type="tertiary",
             )
 
 st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
 
 # Update the used tokens with the latest value after
 # generating a new response.
-used_tokens_holder.write(f"Used tokens: {st.session_state['used_tokens']}")
+used_tokens_holder.caption(f"Used tokens: {st.session_state['used_tokens']}")
