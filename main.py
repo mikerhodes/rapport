@@ -171,7 +171,6 @@ def save_current_chat():
             st.session_state["current_chat_id"],
         )
         st.session_state["current_chat_id"] = chat_id
-        st.success("Chat saved successfully!", icon="✅")
     else:
         st.warning("Nothing to save - chat is empty!", icon="⚠️")
 
@@ -203,9 +202,19 @@ with st.sidebar:
     "## Ollama Python Chatbot"
     col1, col2 = st.columns(2)
     with col1:
-        st.button("New Chat", on_click=clear_chat)
+        st.button(
+            "New Chat",
+            on_click=clear_chat,
+            icon=":material/edit_square:",
+            use_container_width=True,
+        )
     with col2:
-        st.button("Save Chat", on_click=save_current_chat)
+        st.button(
+            "Save Chat",
+            on_click=save_current_chat,
+            icon=":material/save:",
+            use_container_width=True,
+        )
 
     # Display recent chats
     st.markdown("## Recent Chats")
@@ -215,15 +224,16 @@ with st.sidebar:
         col1, col2 = st.columns([4, 1])
         with col1:
             # Highlight current chat
-            title = chat["title"]
+            icon = None
             if chat["id"] == st.session_state["current_chat_id"]:
-                title = f"📍 {title}"
+                icon = ":material/edit:"
             st.button(
-                title,
+                chat["title"],
                 key=f"chat_{chat['id']}",
                 on_click=load_chat,
                 args=[chat["id"]],
                 use_container_width=True,
+                icon=icon,
             )
         with col2:
             st.button(
