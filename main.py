@@ -282,14 +282,18 @@ with chat_col:
             )
         with right:
             st.button(
-                "🔄 Regenerate",
+                "Regenerate",
                 key="regenerate",
                 on_click=regenerate_last_response,
                 type="tertiary",
+                icon=":material/refresh:",
             )
 
 st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
 
 # Update the used tokens with the latest value after
 # generating a new response.
-used_tokens_holder.caption(f"Used tokens: {st.session_state['used_tokens']}")
+try:
+    used_tokens_holder.caption(f"Used tokens: {st.session_state['used_tokens']}")
+except NameError:
+    pass
