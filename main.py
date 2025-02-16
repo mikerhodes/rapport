@@ -252,6 +252,12 @@ with chat_col:
         if message["role"] == "system":
             with st.expander("View system prompt"):
                 st.markdown(message["content"])
+        elif message["content"].startswith("Including content of file `"):
+            with st.chat_message(message["role"]):
+                before, _, after = message["content"].partition("\n")
+                st.markdown(before)
+                with st.expander("View file content"):
+                    st.markdown(after)
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
