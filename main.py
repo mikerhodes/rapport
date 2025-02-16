@@ -101,20 +101,25 @@ def _handle_submit_chat(prompt: str):
 def _handle_submit_include(prompt: str):
     """Handle the user trying to upload a file"""
     # Upload a file to the chat /attach /path/to/file
-    p = Path(prompt.strip().removeprefix("/include "))
-    try:
-        string_data = p.read_text()
-        ext = p.suffix.lstrip(".")
-        _insert_file_chat_message(string_data, p.name, ext)
-    except FileNotFoundError:
-        print(f"Error: File '{p}' not found.")
-        st.toast(f"Error: File '{p}' not found.")
-    except PermissionError:
-        print(f"Error: Permission denied for accessing the file '{p}'.")
-        st.toast(f"Error: Permission denied for accessing the file '{p}'.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        st.toast(f"An unexpected error occurred uploading the file: {e}")
+    parts = prompt.strip().split(" ")
+    files = []
+    if len(parts) == 2:
+        files.append(Path(parts[1]))
+    elif len(parts) == 3:  # path and glob
+        files.extend(Path(parts[1]).glob(parts[2]))
+    print(files)
+    for p in files:
+        try:
+            _insert_file_chat_message(p.read_text(), p.name, p.suffix.lstrip("."))
+        except FileNotFoundError:
+            print(f"Error: File '{p}' not found.")
+            st.toast(f"Error: File '{p}' not found.")
+        except PermissionError:
+            print(f"Error: Permission denied for accessing the file '{p}'.")
+            st.toast(f"Error: Permission denied for accessing the file '{p}'.")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            st.toast(f"An unexpected error occurred uploading the file: {e}")
 
 
 def handle_add_doc_to_chat():
@@ -257,6 +262,12 @@ with col2:
         ```   
 
         Include a file's content into the chat.
+
+        ```
+        /include /path *.glob
+        ```
+
+        Include several files from path using pattern glob.
     """)
 
 with chat_col:
