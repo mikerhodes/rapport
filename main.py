@@ -143,7 +143,10 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg for msg in st.session_state["messages"] if msg["role"] == "user"
+        msg
+        for msg in st.session_state["messages"]
+        if msg["role"] == "user"
+        and not msg["content"].startswith("Including content of file")
     ]
     if not user_messages:
         return "New Chat"
