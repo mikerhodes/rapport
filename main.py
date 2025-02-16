@@ -1,4 +1,5 @@
 from io import StringIO
+from pathlib import Path
 
 import ollama
 import streamlit as st
@@ -85,16 +86,46 @@ def regenerate_last_response():
 def handle_submit_prompt():
     # add latest message to history in format {role, content}
     prompt = st.session_state["user_prompt"]
+    if prompt.startswith("/include"):
+        _handle_submit_include(prompt)
+    else:
+        _handle_submit_chat(prompt)
+
+
+def _handle_submit_chat(prompt: str):
+    """Handle the user submitting a general chat prompt"""
     st.session_state["messages"].append({"role": "user", "content": prompt})
     st.session_state["generate_assistant"] = True
 
 
+def _handle_submit_include(prompt: str):
+    """Handle the user trying to upload a file"""
+    # Upload a file to the chat /attach /path/to/file
+    p = Path(prompt.strip().removeprefix("/include "))
+    try:
+        string_data = p.read_text()
+        ext = p.suffix.lstrip(".")
+        _insert_file_chat_message(string_data, p.name, ext)
+    except FileNotFoundError:
+        print(f"Error: File '{p}' not found.")
+        st.toast(f"Error: File '{p}' not found.")
+    except PermissionError:
+        print(f"Error: Permission denied for accessing the file '{p}'.")
+        st.toast(f"Error: Permission denied for accessing the file '{p}'.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        st.toast(f"An unexpected error occurred uploading the file: {e}")
+
+
 def handle_add_doc_to_chat():
-    print(dir(uploaded_file))
     stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
     string_data = stringio.read()
     ext = uploaded_file.name.split(".")[-1]
-    prompt = f"Including content of file `{uploaded_file.name}` below:\n\n```{ext}\n{string_data}\n```"
+    _insert_file_chat_message(string_data, uploaded_file.name, ext)
+
+
+def _insert_file_chat_message(data, fname, fext: str):
+    prompt = f"Including content of file `{fname}` below:\n\n```{fext}\n{data}\n```"
     st.session_state["messages"].append(
         {
             "role": "user",
@@ -202,8 +233,18 @@ with st.sidebar:
 chat_col, col2 = st.columns([3, 1])
 
 with col2:
-    uploaded_file = st.file_uploader("Upload a plain text, markdown or code file")
-    st.button("Add to Chat", on_click=handle_add_doc_to_chat)
+    with st.expander("Upload a file"):
+        uploaded_file = st.file_uploader("Upload a plain text, markdown or code file")
+        st.button("Add to Chat", on_click=handle_add_doc_to_chat)
+    st.markdown("""
+        Slash commands:
+
+        ```
+        /include /path/to/file
+        ```   
+
+        Include a file's content into the chat.
+    """)
 
 with chat_col:
     # Display chat messages from history on app rerun
