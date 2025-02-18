@@ -289,12 +289,19 @@ with chat_col:
     # Generate a reply and add to history
     if st.session_state["generate_assistant"]:
         st.session_state["generate_assistant"] = False
-        with st.chat_message("assistant"):
+
+        # Using the .empty() container ensures that once the
+        # model starts returning content, we replace the spinner
+        # with the streamed content. We then also need to write
+        # out the full message at the end (for some reason
+        # the message otherwise disappears).
+        with st.chat_message("assistant").empty():
             with st.spinner("Thinking...", show_time=False):
                 message = st.write_stream(stream_model_response())
             st.session_state["messages"].append(
                 {"role": "assistant", "content": message}
             )
+            st.write(message)
 
     # Allow user to regenerate the last response.
     if st.session_state["messages"][-1]["role"] == "assistant":
