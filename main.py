@@ -1,6 +1,8 @@
+from dataclasses import dataclass
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 import ollama
 import streamlit as st
@@ -14,17 +16,13 @@ PREFERRED_MODEL = "phi4:latest"
 #
 
 
-# Don't generate a chat message until the user has prompted
-if "generate_assistant" not in st.session_state:
-    st.session_state["generate_assistant"] = False
+@dataclass
+class Chat:
+    id: str
+    model: str
+    messages: List[Dict]
+    created_at: datetime
 
-# Initialize the chat history manager
-if "history_manager" not in st.session_state:
-    st.session_state["history_manager"] = ChatHistoryManager()
-
-# Store the tokens used in the prompt
-if "used_tokens" not in st.session_state:
-    st.session_state["used_tokens"] = 0
 
 with open("systemprompt.md", "r") as file:
     system_prompt = file.read()
@@ -33,28 +31,26 @@ SYSTEM = {
     "content": system_prompt,
 }
 
-# Message history
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [SYSTEM]
-
-if "current_chat_id" not in st.session_state:
-    st.session_state["current_chat_id"] = None
-
-# Retrieve the current models from ollama
-# Set a preferred model as default if there's none set
-models = [model["model"] for model in ollama.list()["models"]]
-if "model" not in st.session_state and PREFERRED_MODEL in models:
-    st.session_state["model"] = PREFERRED_MODEL
 
 #
 # Helpers
 #
 
 
+def _new_chat():
+    """Initialise and return a new Chat"""
+    id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Chat(
+        id=id,
+        model=st.session_state["model"],
+        messages=[SYSTEM],
+        created_at=datetime.now(),
+    )
+
+
 def clear_chat():
     """Clears the existing chat session"""
-    st.session_state["messages"] = [SYSTEM]
-    st.session_state["current_chat_id"] = None
+    st.session_state["chat"] = _new_chat()
     st.session_state["used_tokens"] = 0
 
 
@@ -87,15 +83,12 @@ def _prepare_messages_for_model(messages: List[Dict]):
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
-    m = ollama.show(st.session_state["model"])
-    model_context_length = m.modelinfo[f"{m.details.family}.context_length"]
-    print(m.details.family, model_context_length)
     response = ollama.chat(
-        model=st.session_state["model"],
-        messages=_prepare_messages_for_model(st.session_state["messages"]),
+        model=st.session_state["chat"].model,
+        messages=_prepare_messages_for_model(st.session_state["chat"].messages),
         stream=True,
         options=ollama.Options(
-            num_ctx=min(8192, model_context_length),
+            num_ctx=min(8192, st.session_state["model_context_length"]),
         ),
     )
     for chunk in response:  # prompt eval count is the token count used from the model
@@ -107,7 +100,7 @@ def stream_model_response():
 def regenerate_last_response():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
-    st.session_state["messages"] = st.session_state["messages"][:-1]
+    st.session_state["chat"].messages = st.session_state["chat"].messages[:-1]
     st.session_state["generate_assistant"] = True
 
 
@@ -122,7 +115,7 @@ def handle_submit_prompt():
 
 def _handle_submit_chat(prompt: str):
     """Handle the user submitting a general chat prompt"""
-    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.session_state["chat"].messages.append({"role": "user", "content": prompt})
     st.session_state["generate_assistant"] = True
 
 
@@ -158,7 +151,7 @@ def handle_add_doc_to_chat():
 
 
 def _insert_file_chat_message(data, fname, fext: str):
-    st.session_state["messages"].append(
+    st.session_state["chat"].messages.append(
         {
             "role": "file",
             "name": fname,
@@ -166,6 +159,19 @@ def _insert_file_chat_message(data, fname, fext: str):
             "data": data,
         }
     )
+
+
+def handle_change_model():
+    model = st.session_state["model"]
+    st.session_state["chat"].model = model
+    _update_context_length(model)
+
+
+def _update_context_length(model):
+    m = ollama.show(model)
+    model_context_length = m.modelinfo[f"{m.details.family}.context_length"]
+    print(m.details.family, model_context_length)
+    st.session_state["model_context_length"] = model_context_length
 
 
 #
@@ -177,7 +183,7 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg for msg in st.session_state["messages"] if msg["role"] == "user"
+        msg for msg in st.session_state["chat"].messages if msg["role"] == "user"
     ]
     if not user_messages:
         return "New Chat"
@@ -196,15 +202,15 @@ def generate_chat_title():
 
 def save_current_chat():
     """Save the current chat session"""
-    if len(st.session_state["messages"]) > 1:  # More than just system message
+    if len(st.session_state["chat"].messages) > 1:  # More than just system message
         title = generate_chat_title()
-        chat_id = st.session_state["history_manager"].save_chat(
-            st.session_state["messages"],
+        st.session_state["history_manager"].save_chat(
+            st.session_state["chat"].messages,
             title,
-            st.session_state["model"],
-            st.session_state["current_chat_id"],
+            st.session_state["chat"].model,
+            st.session_state["chat"].id,
+            st.session_state["chat"].created_at,
         )
-        st.session_state["current_chat_id"] = chat_id
     else:
         st.warning("Nothing to save - chat is empty!", icon="⚠️")
 
@@ -213,15 +219,43 @@ def load_chat(chat_id):
     """Load a chat from history"""
     chat = st.session_state["history_manager"].get_chat(chat_id)
     if chat:
-        st.session_state["messages"] = chat["messages"]
-        st.session_state["model"] = chat["model"]
-        st.session_state["current_chat_id"] = chat_id
+        st.session_state["chat"] = Chat(
+            chat_id, chat["model"], chat["messages"], chat["created_at"]
+        )
 
 
 def delete_chat(chat_id):
     st.session_state["history_manager"].delete_chat(chat_id)
-    if chat_id == st.session_state["current_chat_id"]:
+    if chat_id == st.session_state["chat"].id:
         clear_chat()
+
+
+#
+# Initialise app state
+#
+
+
+# Don't generate a chat message until the user has prompted
+if "generate_assistant" not in st.session_state:
+    st.session_state["generate_assistant"] = False
+
+# Initialize the chat history manager
+if "history_manager" not in st.session_state:
+    st.session_state["history_manager"] = ChatHistoryManager()
+
+# Store the tokens used in the prompt
+if "used_tokens" not in st.session_state:
+    st.session_state["used_tokens"] = 0
+
+# Retrieve the current models from ollama
+# Set a preferred model as default if there's none set
+models = [model["model"] for model in ollama.list()["models"]]
+if "model" not in st.session_state and PREFERRED_MODEL in models:
+    st.session_state["model"] = PREFERRED_MODEL
+handle_change_model()
+
+if "chat" not in st.session_state:
+    st.session_state["chat"] = _new_chat()
 
 
 #
@@ -231,8 +265,6 @@ def delete_chat(chat_id):
 st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:", layout="wide")
 
 with st.sidebar:
-    "## Configuration"
-    st.selectbox("Choose your model", models, key="model")
     "## Ollama Python Chatbot"
     col1, col2 = st.columns(2)
     with col1:
@@ -249,6 +281,9 @@ with st.sidebar:
             icon=":material/save:",
             use_container_width=True,
         )
+    st.selectbox(
+        "Choose your model", models, key="model", on_change=handle_change_model
+    )
 
     # Display recent chats
     st.markdown("## Recent Chats")
@@ -259,7 +294,7 @@ with st.sidebar:
         with col1:
             # Highlight current chat
             icon = None
-            if chat["id"] == st.session_state["current_chat_id"]:
+            if chat["id"] == st.session_state["chat"].id:
                 icon = ":material/edit:"
             st.button(
                 chat["title"],
@@ -303,7 +338,7 @@ with col2:
 
 with chat_col:
     # Display chat messages from history on app rerun
-    for message in st.session_state["messages"]:
+    for message in st.session_state["chat"].messages:
         if message["role"] == "system":
             with st.expander("View system prompt"):
                 st.markdown(message["content"])
@@ -328,13 +363,13 @@ with chat_col:
         with st.chat_message("assistant").empty():
             with st.spinner("Thinking...", show_time=False):
                 message = st.write_stream(stream_model_response())
-            st.session_state["messages"].append(
+            st.session_state["chat"].messages.append(
                 {"role": "assistant", "content": message}
             )
             st.write(message)
 
     # Allow user to regenerate the last response.
-    if st.session_state["messages"][-1]["role"] == "assistant":
+    if st.session_state["chat"].messages[-1]["role"] == "assistant":
         left, right = st.columns([3, 1])
         with left:
             used_tokens_holder = st.empty()

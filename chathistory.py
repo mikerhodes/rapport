@@ -39,16 +39,14 @@ class ChatHistoryManager:
         messages: List[Dict],
         title: str,
         model: str,
-        chat_id: Optional[str] = None,
-    ) -> str:
+        chat_id: str,
+        created_at: datetime,
+    ):
         """
-        Save a chat session to a JSON file. If chat_id is provided, update existing chat.
-        If not provided, create a new chat.
+        Save a chat session to a JSON file.
+        If chat_id is already saved, update existing chat.
+        If not already saved, create a new chat.
         """
-        # Generate new ID if this is a new chat
-        if chat_id is None:
-            chat_id = self._generate_chat_id()
-
         # Create chat data structure
         chat_data = {
             "id": chat_id,
@@ -71,8 +69,6 @@ class ChatHistoryManager:
             "model": model,
         }
         self._save_index(index)
-
-        return chat_id
 
     def get_recent_chats(self, limit: int = 20) -> List[Dict]:
         """Retrieve the most recent chats from the index"""
