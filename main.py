@@ -271,7 +271,12 @@ with st.sidebar:
             )
         with col2:
             st.button(
-                "🗑️", key=f"delete_{chat['id']}", on_click=delete_chat, args=[chat["id"]]
+                "",
+                key=f"delete_{chat['id']}",
+                on_click=delete_chat,
+                args=[chat["id"]],
+                icon=":material/delete:",
+                type="tertiary",
             )
 
 chat_col, col2 = st.columns([3, 1])
