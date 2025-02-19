@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -18,10 +18,10 @@ PREFERRED_MODEL = "phi4:latest"
 
 @dataclass
 class Chat:
-    id: str
     model: str
     messages: List[Dict]
     created_at: datetime
+    id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
 with open("systemprompt.md", "r") as file:
@@ -39,9 +39,7 @@ SYSTEM = {
 
 def _new_chat():
     """Initialise and return a new Chat"""
-    id = datetime.now().strftime("%Y%m%d_%H%M%S")
     return Chat(
-        id=id,
         model=st.session_state["model"],
         messages=[SYSTEM],
         created_at=datetime.now(),
@@ -220,7 +218,10 @@ def load_chat(chat_id):
     chat = st.session_state["history_manager"].get_chat(chat_id)
     if chat:
         st.session_state["chat"] = Chat(
-            chat_id, chat["model"], chat["messages"], chat["created_at"]
+            id=chat_id,
+            model=chat["model"],
+            messages=chat["messages"],
+            created_at=chat["created_at"],
         )
 
 
@@ -252,7 +253,7 @@ if "used_tokens" not in st.session_state:
 models = [model["model"] for model in ollama.list()["models"]]
 if "model" not in st.session_state and PREFERRED_MODEL in models:
     st.session_state["model"] = PREFERRED_MODEL
-handle_change_model()
+_update_context_length(st.session_state["model"])
 
 if "chat" not in st.session_state:
     st.session_state["chat"] = _new_chat()
@@ -265,22 +266,12 @@ if "chat" not in st.session_state:
 st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:", layout="wide")
 
 with st.sidebar:
-    "## Ollama Python Chatbot"
-    col1, col2 = st.columns(2)
-    with col1:
-        st.button(
-            "New Chat",
-            on_click=clear_chat,
-            icon=":material/edit_square:",
-            use_container_width=True,
-        )
-    with col2:
-        st.button(
-            "Save Chat",
-            on_click=save_current_chat,
-            icon=":material/save:",
-            use_container_width=True,
-        )
+    st.button(
+        "New Chat",
+        on_click=clear_chat,
+        icon=":material/edit_square:",
+        use_container_width=True,
+    )
     st.selectbox(
         "Choose your model", models, key="model", on_change=handle_change_model
     )
@@ -367,6 +358,8 @@ with chat_col:
                 {"role": "assistant", "content": message}
             )
             st.write(message)
+            save_current_chat()
+            st.rerun()
 
     # Allow user to regenerate the last response.
     if st.session_state["chat"].messages[-1]["role"] == "assistant":
