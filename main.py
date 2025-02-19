@@ -1,5 +1,6 @@
 from io import StringIO
 from pathlib import Path
+from typing import List, Dict
 
 import ollama
 import streamlit as st
@@ -57,6 +58,33 @@ def clear_chat():
     st.session_state["used_tokens"] = 0
 
 
+def _prepare_messages_for_model(messages: List[Dict]):
+    """Converts message history format into format for model"""
+    # Models like things in this order:
+    # - System
+    # - Files
+    # - Chat
+    # System and files for context, chat for the task
+    result = []
+
+    system = [m for m in messages if m["role"] == "system"]
+    file = [m for m in messages if m["role"] == "file"]
+    chat = [m for m in messages if m["role"] not in ["system", "file"]]
+
+    result.extend(system)
+    for m in file:
+        # Models don't have a file role, so convert
+        prompt = f"""
+        `{m["name"]}`
+        ---
+        {m["data"]}
+
+        ---"""
+        result.append({"role": "assistant", "content": prompt})
+    result.extend(chat)
+    return result
+
+
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
     m = ollama.show(st.session_state["model"])
@@ -64,7 +92,7 @@ def stream_model_response():
     print(m.details.family, model_context_length)
     response = ollama.chat(
         model=st.session_state["model"],
-        messages=st.session_state["messages"],
+        messages=_prepare_messages_for_model(st.session_state["messages"]),
         stream=True,
         options=ollama.Options(
             num_ctx=min(8192, model_context_length),
@@ -130,11 +158,12 @@ def handle_add_doc_to_chat():
 
 
 def _insert_file_chat_message(data, fname, fext: str):
-    prompt = f"Including content of file `{fname}` below:\n\n```{fext}\n{data}\n```"
     st.session_state["messages"].append(
         {
-            "role": "user",
-            "content": prompt,
+            "role": "file",
+            "name": fname,
+            "ext": fext,
+            "data": data,
         }
     )
 
@@ -148,17 +177,14 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg
-        for msg in st.session_state["messages"]
-        if msg["role"] == "user"
-        and not msg["content"].startswith("Including content of file")
+        msg for msg in st.session_state["messages"] if msg["role"] == "user"
     ]
     if not user_messages:
         return "New Chat"
 
     # Take first 6 words of first message
     first_message = user_messages[0]["content"]
-    words = first_message.split()[:6]
+    words = first_message.split()[:10]
     title = " ".join(words)
 
     # Add ellipsis if we truncated the message
@@ -276,12 +302,11 @@ with chat_col:
         if message["role"] == "system":
             with st.expander("View system prompt"):
                 st.markdown(message["content"])
-        elif message["content"].startswith("Including content of file `"):
-            with st.chat_message(message["role"]):
-                before, _, after = message["content"].partition("\n")
-                st.markdown(before)
+        elif message["role"] == "file":
+            with st.chat_message(message["role"], avatar=":material/upload_file:"):
+                st.markdown(f"Included `{message['name']}` in chat.")
                 with st.expander("View file content"):
-                    st.markdown(after)
+                    st.markdown(f"```{message['ext']}\n{message['data']}\n```")
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
