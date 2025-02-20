@@ -242,7 +242,9 @@ if "generate_assistant" not in st.session_state:
 
 # Initialize the chat history manager
 if "history_manager" not in st.session_state:
-    st.session_state["history_manager"] = ChatHistoryManager()
+    ch = ChatHistoryManager()
+    ch.clear_old_chats()  # clear on startup
+    st.session_state["history_manager"] = ch
 
 # Store the tokens used in the prompt
 if "used_tokens" not in st.session_state:

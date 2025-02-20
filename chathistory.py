@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class ChatHistoryManager:
@@ -109,3 +109,40 @@ class ChatHistoryManager:
             return True
         except FileNotFoundError:
             return False
+
+    def clear_old_chats(self, days: int = 7) -> int:
+        """
+        Delete chat files and entries from the index that are older than a specified number of days.
+
+        Args:
+            days (int): Number of days to consider as "old".
+
+        Returns:
+            int: The number of chats deleted.
+        """
+        cutoff_date = datetime.now().date() - timedelta(days=days)
+
+        index = self._load_index()
+        chat_ids_to_delete = [
+            chat_id
+            for chat_id, data in index.items()
+            if datetime.fromisoformat(data["created_at"]).date() < cutoff_date
+        ]
+
+        # Delete the files and update the index
+        deleted_count = 0
+        for chat_id in chat_ids_to_delete:
+            try:
+                chat_path = self.chats_dir / f"{chat_id}.json"
+                chat_path.unlink()
+            except FileNotFoundError:
+                pass
+            del index[chat_id]  # Update index
+            deleted_count += 1
+
+        if deleted_count > 0:
+            self._save_index(index)  # Save updated index
+
+        print(f"Cleared {deleted_count} old chats from before {cutoff_date}")
+
+        return deleted_count
