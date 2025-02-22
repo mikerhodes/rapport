@@ -1,5 +1,3 @@
-from dataclasses import dataclass, field
-from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from typing import Dict, List
@@ -7,49 +5,18 @@ from typing import Dict, List
 import ollama
 import streamlit as st
 
-from chathistory import ChatHistoryManager
+from chatmodel import Chat, new_chat
 
 PREFERRED_MODEL = "phi4:latest"
-
-#
-# initialize state
-#
-
-
-@dataclass
-class Chat:
-    model: str
-    messages: List[Dict]
-    created_at: datetime
-    id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
-
-
-with open("systemprompt.md", "r") as file:
-    system_prompt = file.read()
-SYSTEM = {
-    "role": "system",
-    "content": system_prompt,
-}
-
 
 #
 # Helpers
 #
 
 
-def _new_chat():
-    """Initialise and return a new Chat"""
-    return Chat(
-        model=st.session_state["model"],
-        messages=[SYSTEM],
-        created_at=datetime.now(),
-    )
-
-
 def clear_chat():
     """Clears the existing chat session"""
-    st.session_state["chat"] = _new_chat()
-    st.session_state["used_tokens"] = 0
+    del st.session_state["chat"]
 
 
 def _prepare_messages_for_model(messages: List[Dict]):
@@ -209,8 +176,6 @@ def save_current_chat():
             st.session_state["chat"].id,
             st.session_state["chat"].created_at,
         )
-    else:
-        st.warning("Nothing to save - chat is empty!", icon="⚠️")
 
 
 def load_chat(chat_id):
@@ -225,12 +190,6 @@ def load_chat(chat_id):
         )
 
 
-def delete_chat(chat_id):
-    st.session_state["history_manager"].delete_chat(chat_id)
-    if chat_id == st.session_state["chat"].id:
-        clear_chat()
-
-
 #
 # Initialise app state
 #
@@ -239,12 +198,6 @@ def delete_chat(chat_id):
 # Don't generate a chat message until the user has prompted
 if "generate_assistant" not in st.session_state:
     st.session_state["generate_assistant"] = False
-
-# Initialize the chat history manager
-if "history_manager" not in st.session_state:
-    ch = ChatHistoryManager()
-    ch.clear_old_chats()  # clear on startup
-    st.session_state["history_manager"] = ch
 
 # Store the tokens used in the prompt
 if "used_tokens" not in st.session_state:
@@ -257,15 +210,17 @@ if "model" not in st.session_state and PREFERRED_MODEL in models:
     st.session_state["model"] = PREFERRED_MODEL
 _update_context_length(st.session_state["model"])
 
+# Start a new chat if there isn't one active.
+# "New Chat" is implemented as `del st.session_state["chat"]`
 if "chat" not in st.session_state:
-    st.session_state["chat"] = _new_chat()
+    st.session_state["chat"] = new_chat(st.session_state["model"])
+    st.session_state["used_tokens"] = 0
 
 
 #
 # Start rendering the app
 #
 
-st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:", layout="wide")
 
 with st.sidebar:
     st.button(
@@ -280,32 +235,21 @@ with st.sidebar:
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = st.session_state["history_manager"].get_recent_chats()
+    recent_chats = st.session_state["history_manager"].get_recent_chats(limit=5)
 
     for chat in recent_chats:
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            # Highlight current chat
-            icon = None
-            if chat["id"] == st.session_state["chat"].id:
-                icon = ":material/edit:"
-            st.button(
-                chat["title"],
-                key=f"chat_{chat['id']}",
-                on_click=load_chat,
-                args=[chat["id"]],
-                use_container_width=True,
-                icon=icon,
-            )
-        with col2:
-            st.button(
-                "",
-                key=f"delete_{chat['id']}",
-                on_click=delete_chat,
-                args=[chat["id"]],
-                icon=":material/delete:",
-                type="tertiary",
-            )
+        # Highlight current chat
+        icon = None
+        if chat["id"] == st.session_state["chat"].id:
+            icon = ":material/edit:"
+        st.button(
+            chat["title"],
+            key=f"chat_{chat['id']}",
+            on_click=load_chat,
+            args=[chat["id"]],
+            use_container_width=True,
+            icon=icon,
+        )
 
 chat_col, col2 = st.columns([3, 1])
 
