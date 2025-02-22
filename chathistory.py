@@ -170,7 +170,7 @@ class ChatHistoryManager:
 
         return deleted
 
-    def clear_old_chats(self, days: int = 7) -> int:
+    def clear_old_chats(self, days: int = 30) -> int:
         """
         Delete chats and their messages from the database that are older than a specified number of days.
 

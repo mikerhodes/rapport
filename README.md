@@ -4,7 +4,7 @@ Interlocution is a simple python LLM chatbot interface. It uses Ollama to run LL
 
 I built this because I'm excited by the idea that one can now (Jan 2025) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
 
-- Chat history saved for 7 days to local SQLite database.
+- Chat history saved for 30 days to local SQLite database.
 - File uploads.
 - Regenerate assistant chat messages (the models might be good, but they still emit duds!).
 - Select between installed Ollama models.
