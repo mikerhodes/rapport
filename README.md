@@ -61,14 +61,8 @@ I tried out [uv](https://docs.astral.sh/uv/) in this project.
 brew install uv
 ```
 
-In this directory I ran this to add the packages:
+As `uv run` installs dependencies, run the app using:
 
 ```
-uv add streamlit ollama
-```
-
-But `uv run` installs dependencies, so you should be able to just use:
-
-```
-uv run streamlit run main.py
+uv run streamlit run entrypoint.py
 ```
