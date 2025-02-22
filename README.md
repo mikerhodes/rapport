@@ -1,18 +1,18 @@
 # Interlocution
 
-This is a simple python LLM chatbot. It uses Ollama to run LLMs locally and Streamlit to create a chatbot user interface.
+Interlocution is a simple python LLM chatbot interface. It uses Ollama to run LLMs locally and Streamlit to create the chatbot user interface.
 
-![](./images/chat-screenshot.png)
-
-![](./images/history-screenshot.png)
-
-I built this because I'm excited by the idea that one can now (Jan 2025) run pretty competent models locally. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
+I built this because I'm excited by the idea that one can now (Jan 2025) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
 
 - Chat history saved for 7 days to local SQLite database.
 - File uploads.
 - Regenerate assistant chat messages (the models might be good, but they still emit duds!).
 - Select between installed Ollama models.
 - Customise the system prompt by editing `systemprompt.md`.
+
+![](./images/chat-screenshot.png)
+
+![](./images/history-screenshot.png)
 
 Libraries:
 
