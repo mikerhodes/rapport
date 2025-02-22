@@ -150,7 +150,7 @@ class ChatHistoryManager:
             return {
                 "id": chat_row[0],
                 "title": chat_row[1],
-                "created_at": chat_row[2],
+                "created_at": datetime.fromisoformat(chat_row[2]),
                 "model": chat_row[3],
                 "messages": messages,
             }
