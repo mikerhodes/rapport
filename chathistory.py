@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 class ChatHistoryManager:
     def __init__(self):
         # Ensure the .assistant directory exists
-        self.base_dir = Path.home() / ".assistant"
+        self.base_dir = Path.home() / ".interlocution"
         self.base_dir.mkdir(exist_ok=True)
 
         # Initialize SQLite database

@@ -1,4 +1,4 @@
-# OllamaChat
+# Interlocution
 
 This is a simple python LLM chatbot. It uses Ollama to run LLMs locally and Streamlit to create a chatbot user interface.
 

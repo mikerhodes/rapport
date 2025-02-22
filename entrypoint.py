@@ -23,5 +23,5 @@ pg = st.navigation(
         st.Page(PAGE_HISTORY, title="History", icon=":material/history:"),
     ]
 )
-st.set_page_config(page_title="OllamaChat", page_icon=":robot_face:", layout="wide")
+st.set_page_config(page_title="Interlocution", page_icon=":robot_face:", layout="wide")
 pg.run()
