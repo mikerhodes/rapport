@@ -1,9 +1,10 @@
 from io import StringIO
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, cast
 
 import streamlit as st
 
+from chatgateway import ChatGateway
 from chatmodel import Chat, new_chat
 
 PREFERRED_MODEL = "phi4:latest"
@@ -47,7 +48,7 @@ def _prepare_messages_for_model(messages: List[Dict]):
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
-    cg = st.session_state["chat_gateway"]
+    cg = cast(ChatGateway, st.session_state["chat_gateway"])
     response = cg.chat(
         model=st.session_state["chat"].model,
         messages=_prepare_messages_for_model(st.session_state["chat"].messages),
@@ -55,9 +56,9 @@ def stream_model_response():
         num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in response:  # prompt eval count is the token count used from the model
-        if chunk.prompt_eval_count is not None:
-            st.session_state["used_tokens"] = chunk.prompt_eval_count + chunk.eval_count
-        yield chunk["message"]["content"]
+        if chunk.used_tokens is not None:
+            st.session_state["used_tokens"] = chunk.used_tokens
+        yield chunk.content
 
 
 def regenerate_last_response():
@@ -133,9 +134,7 @@ def handle_change_model():
 def _update_context_length(model):
     cg = st.session_state["chat_gateway"]
     m = cg.show(model)
-    model_context_length = m.modelinfo[f"{m.details.family}.context_length"]
-    print(m.details.family, model_context_length)
-    st.session_state["model_context_length"] = model_context_length
+    st.session_state["model_context_length"] = m.context_length
 
 
 #
