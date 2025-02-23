@@ -2,7 +2,6 @@ from io import StringIO
 from pathlib import Path
 from typing import Dict, List
 
-import ollama
 import streamlit as st
 
 from chatmodel import Chat, new_chat
@@ -48,13 +47,12 @@ def _prepare_messages_for_model(messages: List[Dict]):
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
-    response = ollama.chat(
+    cg = st.session_state["chat_gateway"]
+    response = cg.chat(
         model=st.session_state["chat"].model,
         messages=_prepare_messages_for_model(st.session_state["chat"].messages),
         stream=True,
-        options=ollama.Options(
-            num_ctx=min(8192, st.session_state["model_context_length"]),
-        ),
+        num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in response:  # prompt eval count is the token count used from the model
         if chunk.prompt_eval_count is not None:
@@ -133,7 +131,8 @@ def handle_change_model():
 
 
 def _update_context_length(model):
-    m = ollama.show(model)
+    cg = st.session_state["chat_gateway"]
+    m = cg.show(model)
     model_context_length = m.modelinfo[f"{m.details.family}.context_length"]
     print(m.details.family, model_context_length)
     st.session_state["model_context_length"] = model_context_length
@@ -205,7 +204,7 @@ if "used_tokens" not in st.session_state:
 
 # Retrieve the current models from ollama
 # Set a preferred model as default if there's none set
-models = [model["model"] for model in ollama.list()["models"]]
+models = st.session_state["chat_gateway"].list()
 if "model" not in st.session_state and PREFERRED_MODEL in models:
     st.session_state["model"] = PREFERRED_MODEL
 _update_context_length(st.session_state["model"])

@@ -1,6 +1,7 @@
 import streamlit as st
 
 from chathistory import ChatHistoryManager
+from chatgateway import ChatGateway
 from chatmodel import PAGE_CHAT, PAGE_HISTORY
 
 
@@ -9,6 +10,10 @@ if "history_manager" not in st.session_state:
     ch = ChatHistoryManager()
     ch.clear_old_chats()  # clear on startup
     st.session_state["history_manager"] = ch
+
+if "chat_gateway" not in st.session_state:
+    print("Init chat gateway")
+    st.session_state["chat_gateway"] = ChatGateway()
 
 # Callbacks use switch_to_page to do navigation,
 # as st.switch_path doesn't work from callbacks.
