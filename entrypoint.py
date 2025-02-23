@@ -17,6 +17,8 @@ if sp:
     del st.session_state["switch_to_page"]
     st.switch_page(sp)
 
+st.logo(image="images/logo.png", size="large", icon_image="images/logo-small.png")
+
 pg = st.navigation(
     [
         st.Page(PAGE_CHAT, title="Chat", icon=":material/chat_bubble:"),
