@@ -3,10 +3,14 @@ name = "ollama-chatbot-playground"
 version = "0.1.0"
 description = "An experiment in using Ollama and Streamlit to try out LLMs locally"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.46.0",
     "ollama>=0.4.7",
     "streamlit>=1.42.0",
     "watchdog>=6.0.0",
 ]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
