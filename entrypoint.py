@@ -22,7 +22,9 @@ if sp:
     del st.session_state["switch_to_page"]
     st.switch_page(sp)
 
-st.logo(image="images/logo.png", size="large", icon_image="images/logo-small.png")
+st.logo(
+    image="images/logo.png", size="large", icon_image="images/logo-small.png"
+)
 
 pg = st.navigation(
     [
@@ -30,5 +32,7 @@ pg = st.navigation(
         st.Page(PAGE_HISTORY, title="History", icon=":material/history:"),
     ]
 )
-st.set_page_config(page_title="Interlocution", page_icon=":robot_face:", layout="wide")
+st.set_page_config(
+    page_title="Interlocution", page_icon=":robot_face:", layout="wide"
+)
 pg.run()

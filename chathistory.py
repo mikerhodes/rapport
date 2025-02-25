@@ -126,7 +126,8 @@ class ChatHistoryManager:
         chat_ids_to_delete = [
             chat_id
             for chat_id, data in index.items()
-            if datetime.fromisoformat(data["created_at"]).date() < cutoff_date
+            if datetime.fromisoformat(data["created_at"]).date()
+            < cutoff_date
         ]
 
         # Delete the files and update the index

@@ -51,11 +51,15 @@ def stream_model_response():
     cg = cast(ChatGateway, st.session_state["chat_gateway"])
     response = cg.chat(
         model=st.session_state["chat"].model,
-        messages=_prepare_messages_for_model(st.session_state["chat"].messages),
+        messages=_prepare_messages_for_model(
+            st.session_state["chat"].messages
+        ),
         stream=True,
         num_ctx=min(8192, st.session_state["model_context_length"]),
     )
-    for chunk in response:  # prompt eval count is the token count used from the model
+    for chunk in (
+        response
+    ):  # prompt eval count is the token count used from the model
         if chunk.used_tokens is not None:
             st.session_state["used_tokens"] = chunk.used_tokens
         yield chunk.content
@@ -64,7 +68,9 @@ def stream_model_response():
 def regenerate_last_response():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
-    st.session_state["chat"].messages = st.session_state["chat"].messages[:-1]
+    st.session_state["chat"].messages = st.session_state["chat"].messages[
+        :-1
+    ]
     st.session_state["generate_assistant"] = True
 
 
@@ -79,7 +85,9 @@ def handle_submit_prompt():
 
 def _handle_submit_chat(prompt: str):
     """Handle the user submitting a general chat prompt"""
-    st.session_state["chat"].messages.append({"role": "user", "content": prompt})
+    st.session_state["chat"].messages.append(
+        {"role": "user", "content": prompt}
+    )
     st.session_state["generate_assistant"] = True
 
 
@@ -95,13 +103,17 @@ def _handle_submit_include(prompt: str):
     print(files)
     for p in files:
         try:
-            _insert_file_chat_message(p.read_text(), p.name, p.suffix.lstrip("."))
+            _insert_file_chat_message(
+                p.read_text(), p.name, p.suffix.lstrip(".")
+            )
         except FileNotFoundError:
             print(f"Error: File '{p}' not found.")
             st.toast(f"Error: File '{p}' not found.")
         except PermissionError:
             print(f"Error: Permission denied for accessing the file '{p}'.")
-            st.toast(f"Error: Permission denied for accessing the file '{p}'.")
+            st.toast(
+                f"Error: Permission denied for accessing the file '{p}'."
+            )
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             st.toast(f"An unexpected error occurred uploading the file: {e}")
@@ -146,7 +158,9 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg for msg in st.session_state["chat"].messages if msg["role"] == "user"
+        msg
+        for msg in st.session_state["chat"].messages
+        if msg["role"] == "user"
     ]
     if not user_messages:
         return "New Chat"
@@ -165,7 +179,9 @@ def generate_chat_title():
 
 def save_current_chat():
     """Save the current chat session"""
-    if len(st.session_state["chat"].messages) > 1:  # More than just system message
+    if (
+        len(st.session_state["chat"].messages) > 1
+    ):  # More than just system message
         title = generate_chat_title()
         st.session_state["history_manager"].save_chat(
             st.session_state["chat"].messages,
@@ -228,12 +244,17 @@ with st.sidebar:
         use_container_width=True,
     )
     st.selectbox(
-        "Choose your model", models, key="model", on_change=handle_change_model
+        "Choose your model",
+        models,
+        key="model",
+        on_change=handle_change_model,
     )
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = st.session_state["history_manager"].get_recent_chats(limit=5)
+    recent_chats = st.session_state["history_manager"].get_recent_chats(
+        limit=5
+    )
 
     for chat in recent_chats:
         # Highlight current chat
@@ -253,7 +274,9 @@ chat_col, col2 = st.columns([3, 1])
 
 with col2:
     with st.expander("Upload a file"):
-        uploaded_file = st.file_uploader("Upload a plain text, markdown or code file")
+        uploaded_file = st.file_uploader(
+            "Upload a plain text, markdown or code file"
+        )
         st.button("Add to Chat", on_click=handle_add_doc_to_chat)
     st.markdown("""
         Slash commands:
@@ -278,10 +301,14 @@ with chat_col:
             with st.expander("View system prompt"):
                 st.markdown(message["content"])
         elif message["role"] == "file":
-            with st.chat_message(message["role"], avatar=":material/upload_file:"):
+            with st.chat_message(
+                message["role"], avatar=":material/upload_file:"
+            ):
                 st.markdown(f"Included `{message['name']}` in chat.")
                 with st.expander("View file content"):
-                    st.markdown(f"```{message['ext']}\n{message['data']}\n```")
+                    st.markdown(
+                        f"```{message['ext']}\n{message['data']}\n```"
+                    )
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -322,11 +349,15 @@ with chat_col:
                 icon=":material/refresh:",
             )
 
-st.chat_input("Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt)
+st.chat_input(
+    "Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt
+)
 
 # Update the used tokens with the latest value after
 # generating a new response.
 try:
-    used_tokens_holder.caption(f"Used tokens: {st.session_state['used_tokens']}")
+    used_tokens_holder.caption(
+        f"Used tokens: {st.session_state['used_tokens']}"
+    )
 except NameError:
     pass

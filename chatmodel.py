@@ -17,7 +17,9 @@ class Chat:
     model: str
     messages: List[Dict]
     created_at: datetime
-    id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
+    id: str = field(
+        default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
 
 
 def new_chat(model: str) -> Chat:

@@ -27,7 +27,11 @@ class ChatAdaptor(Protocol):
     def list(self) -> List[str]: ...
 
     def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool, num_ctx: int
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        stream: bool,
+        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]: ...
 
 
@@ -55,7 +59,11 @@ class ChatGateway:
         return self.models
 
     def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool, num_ctx: int
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        stream: bool,
+        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
         response = c.chat(
@@ -89,12 +97,18 @@ class OllamaAdaptor(ChatAdaptor):
     def show(self, model: str) -> Union[ModelInfo, None]:
         m = self.c.show(model)
         if m and m.modelinfo and m.details:
-            return ModelInfo(model, m.modelinfo[f"{m.details.family}.context_length"])
+            return ModelInfo(
+                model, m.modelinfo[f"{m.details.family}.context_length"]
+            )
         else:
             return None
 
     def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool, num_ctx: int
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        stream: bool,
+        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         response = self.c.chat(
             model=model,
@@ -111,7 +125,9 @@ class OllamaAdaptor(ChatAdaptor):
                     used_tokens=chunk.prompt_eval_count + chunk.eval_count,
                 )
             else:
-                mc = MessageChunk(content=chunk["message"]["content"], used_tokens=None)
+                mc = MessageChunk(
+                    content=chunk["message"]["content"], used_tokens=None
+                )
             yield mc
 
 
@@ -132,7 +148,11 @@ class AnthropicAdaptor(ChatAdaptor):
         return ModelInfo(model, 200_000)
 
     def chat(
-        self, model: str, messages: List[Dict[str, str]], stream: bool, num_ctx: int
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        stream: bool,
+        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         system_prompt = "\n\n".join(
             [m["content"] for m in messages if m["role"] == "system"]
@@ -151,7 +171,14 @@ class AnthropicAdaptor(ChatAdaptor):
         )
         for event in chunk_stream:
             # print(event.type)
-            if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                yield MessageChunk(content=event.delta.text, used_tokens=None)
+            if (
+                event.type == "content_block_delta"
+                and event.delta.type == "text_delta"
+            ):
+                yield MessageChunk(
+                    content=event.delta.text, used_tokens=None
+                )
             elif event.type == "message_delta":
-                yield MessageChunk(content="", used_tokens=event.usage.output_tokens)
+                yield MessageChunk(
+                    content="", used_tokens=event.usage.output_tokens
+                )
