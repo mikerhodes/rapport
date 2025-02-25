@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Protocol, Union
+from typing import Dict, Generator, List, Protocol, Optional
 
 from anthropic.types import MessageParam
 import ollama
@@ -15,14 +15,14 @@ class ModelInfo:
 
 @dataclass
 class MessageChunk:
-    used_tokens: Union[int, None]
+    used_tokens: Optional[int]
     content: str
 
 
 class ChatAdaptor(Protocol):
     """ChatAdaptor adapts an LLM interface to ChatGateway's expectations."""
 
-    def show(self, model: str) -> Union[ModelInfo, None]: ...
+    def show(self, model: str) -> Optional[ModelInfo]: ...
 
     def list(self) -> List[str]: ...
 
@@ -30,7 +30,6 @@ class ChatAdaptor(Protocol):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        stream: bool,
         num_ctx: int,
     ) -> Generator[MessageChunk, None, None]: ...
 
@@ -62,20 +61,18 @@ class ChatGateway:
         self,
         model: str,
         messages: List[Dict[str, str]],
-        stream: bool,
         num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
         response = c.chat(
             model=model,
             messages=messages,
-            stream=True,
             num_ctx=num_ctx,
         )
         for chunk in response:
             yield chunk
 
-    def show(self, model: str) -> Union[ModelInfo, None]:
+    def show(self, model: str) -> Optional[ModelInfo]:
         c = self.model_to_client[model]
         return c.show(model)
 
@@ -94,7 +91,7 @@ class OllamaAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
-    def show(self, model: str) -> Union[ModelInfo, None]:
+    def show(self, model: str) -> Optional[ModelInfo]:
         m = self.c.show(model)
         if m and m.modelinfo and m.details:
             return ModelInfo(
@@ -107,7 +104,6 @@ class OllamaAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        stream: bool,
         num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         response = self.c.chat(
@@ -138,20 +134,23 @@ class AnthropicAdaptor(ChatAdaptor):
     def __init__(self):
         # For now we hardcode Claude models we want to use
         # while we firm up how ChatGateway should work.
-        self.models = ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest"]
+        self.models = [
+            "claude-3-7-sonnet-latest",
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
+        ]
         self.c = Anthropic()
 
     def list(self) -> List[str]:
         return self.models
 
-    def show(self, model: str) -> Union[ModelInfo, None]:
+    def show(self, model: str) -> Optional[ModelInfo]:
         return ModelInfo(model, 200_000)
 
     def chat(
         self,
         model: str,
         messages: List[Dict[str, str]],
-        stream: bool,
         num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         system_prompt = "\n\n".join(
@@ -163,7 +162,7 @@ class AnthropicAdaptor(ChatAdaptor):
             if m["role"] in ["user", "assistant"]
         ]
         chunk_stream = self.c.messages.create(
-            max_tokens=1024,
+            max_tokens=2048,
             messages=anth_messages,
             model=model,
             stream=True,

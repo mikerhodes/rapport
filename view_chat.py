@@ -54,7 +54,6 @@ def stream_model_response():
         messages=_prepare_messages_for_model(
             st.session_state["chat"].messages
         ),
-        stream=True,
         num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in (
