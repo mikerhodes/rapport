@@ -1,3 +1,5 @@
+import textwrap
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from typing import Dict, List, cast
@@ -199,8 +201,35 @@ def load_chat(chat_id):
             id=chat_id,
             model=chat["model"],
             messages=chat["messages"],
-            created_at=chat["created_at"],
+            created_at=datetime.fromisoformat(chat["created_at"]),
         )
+        st.session_state["model"] = chat["model"]
+
+
+def _chat_as_markdown() -> str:
+    chat = cast(Chat, st.session_state["chat"])
+    lines = []
+    lines.append("---")
+    lines.append("model: " + chat.model)
+    lines.append("created_at: " + chat.created_at.isoformat())
+    lines.append("---\n")
+    lines.append(f"# {generate_chat_title()}\n")
+    for m in chat.messages:
+        lines.append(f"**{m['role']}**\n")
+        if m["role"] == "file":
+            lines.append(
+                f"""
+File `{m["name"]}` included in conversation:
+
+```{m["ext"]}
+{m["data"]}
+```
+                """
+            )
+        else:
+            lines.append(m["content"])
+        lines.append("\n")
+    return "\n".join(lines)
 
 
 #
@@ -241,6 +270,13 @@ with st.sidebar:
         on_click=clear_chat,
         icon=":material/edit_square:",
         use_container_width=True,
+    )
+    st.download_button(
+        "Download chat",
+        _chat_as_markdown(),
+        file_name="conversation.md",
+        use_container_width=True,
+        icon=":material/download:",
     )
     st.selectbox(
         "Choose your model",
