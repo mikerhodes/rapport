@@ -11,7 +11,10 @@ def delete_chat(chat_id):
     """Delete a chat, starting a new chat if the deleted chat
     is currently the active chat"""
     st.session_state["history_manager"].delete_chat(chat_id)
-    if chat_id == st.session_state["chat"].id:
+    if (
+        st.session_state.get("chat")
+        and chat_id == st.session_state["chat"].id
+    ):
         del st.session_state["chat"]
 
 
