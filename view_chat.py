@@ -8,8 +8,25 @@ import streamlit as st
 
 from chatgateway import ChatGateway
 from chatmodel import Chat, new_chat
+from chathistory import ChatHistoryManager
 
 PREFERRED_MODEL = "phi4:latest"
+
+
+class State:
+    chat: Chat
+    user_prompt: str
+    chat_gateway: ChatGateway
+    model_context_length: int
+    used_tokens: int
+    generate_assistant: bool
+    model: str
+    history_manager: ChatHistoryManager
+
+
+# _s acts as a typed accessor for session state.
+_s = cast(State, st.session_state)
+
 
 #
 # Helpers
@@ -18,7 +35,8 @@ PREFERRED_MODEL = "phi4:latest"
 
 def clear_chat():
     """Clears the existing chat session"""
-    del st.session_state["chat"]
+    del _s.chat
+    # del st.session_state["chat"]
 
 
 def _prepare_messages_for_model(messages: List[Dict]):
@@ -50,34 +68,31 @@ def _prepare_messages_for_model(messages: List[Dict]):
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
-    cg = cast(ChatGateway, st.session_state["chat_gateway"])
-    response = cg.chat(
-        model=st.session_state["chat"].model,
-        messages=_prepare_messages_for_model(
-            st.session_state["chat"].messages
-        ),
+    # cg = cast(ChatGateway, st.session_state["chat_gateway"])
+    response = _s.chat_gateway.chat(
+        model=_s.chat.model,
+        messages=_prepare_messages_for_model(_s.chat.messages),
         num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in (
         response
     ):  # prompt eval count is the token count used from the model
         if chunk.used_tokens is not None:
-            st.session_state["used_tokens"] = chunk.used_tokens
+            _s.used_tokens = chunk.used_tokens
         yield chunk.content
 
 
 def regenerate_last_response():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
-    st.session_state["chat"].messages = st.session_state["chat"].messages[
-        :-1
-    ]
-    st.session_state["generate_assistant"] = True
+    _s.chat.messages = st.session_state["chat"].messages[:-1]
+    _s.generate_assistant = True
 
 
 def handle_submit_prompt():
     # add latest message to history in format {role, content}
-    prompt = st.session_state["user_prompt"]
+    prompt = _s.user_prompt
+    # prompt = st.session_state["user_prompt"]
     if prompt.startswith("/include"):
         _handle_submit_include(prompt)
     else:
@@ -86,10 +101,8 @@ def handle_submit_prompt():
 
 def _handle_submit_chat(prompt: str):
     """Handle the user submitting a general chat prompt"""
-    st.session_state["chat"].messages.append(
-        {"role": "user", "content": prompt}
-    )
-    st.session_state["generate_assistant"] = True
+    _s.chat.messages.append({"role": "user", "content": prompt})
+    _s.generate_assistant = True
 
 
 def _handle_submit_include(prompt: str):
@@ -128,7 +141,7 @@ def handle_add_doc_to_chat():
 
 
 def _insert_file_chat_message(data, fname, fext: str):
-    st.session_state["chat"].messages.append(
+    _s.chat.messages.append(
         {
             "role": "file",
             "name": fname,
@@ -139,15 +152,17 @@ def _insert_file_chat_message(data, fname, fext: str):
 
 
 def handle_change_model():
-    model = st.session_state["model"]
-    st.session_state["chat"].model = model
+    model = _s.model
+    _s.chat.model = model
     _update_context_length(model)
 
 
 def _update_context_length(model):
-    cg = st.session_state["chat_gateway"]
-    m = cg.show(model)
-    st.session_state["model_context_length"] = m.context_length
+    m = _s.chat_gateway.show(model)
+    if m is not None:
+        _s.model_context_length = m.context_length
+    else:
+        _s.model_context_length = 0
 
 
 #
@@ -159,9 +174,7 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg
-        for msg in st.session_state["chat"].messages
-        if msg["role"] == "user"
+        msg for msg in _s.chat.messages if msg["role"] == "user"
     ]
     if not user_messages:
         return "New Chat"
@@ -180,34 +193,32 @@ def generate_chat_title():
 
 def save_current_chat():
     """Save the current chat session"""
-    if (
-        len(st.session_state["chat"].messages) > 1
-    ):  # More than just system message
+    if len(_s.chat.messages) > 1:  # More than just system message
         title = generate_chat_title()
-        st.session_state["history_manager"].save_chat(
-            st.session_state["chat"].messages,
+        _s.history_manager.save_chat(
+            _s.chat.messages,
             title,
-            st.session_state["chat"].model,
-            st.session_state["chat"].id,
-            st.session_state["chat"].created_at,
+            _s.chat.model,
+            _s.chat.id,
+            _s.chat.created_at,
         )
 
 
 def load_chat(chat_id):
     """Load a chat from history"""
-    chat = st.session_state["history_manager"].get_chat(chat_id)
+    chat = _s.history_manager.get_chat(chat_id)
     if chat:
-        st.session_state["chat"] = Chat(
+        _s.chat = Chat(
             id=chat_id,
             model=chat["model"],
             messages=chat["messages"],
             created_at=datetime.fromisoformat(chat["created_at"]),
         )
-        st.session_state["model"] = chat["model"]
+        _s.model = chat["model"]
 
 
 def _chat_as_markdown() -> str:
-    chat = cast(Chat, st.session_state["chat"])
+    chat = _s.chat
     lines = []
     lines.append("---")
     lines.append("model: " + chat.model)
@@ -239,24 +250,24 @@ File `{m["name"]}` included in conversation:
 
 # Don't generate a chat message until the user has prompted
 if "generate_assistant" not in st.session_state:
-    st.session_state["generate_assistant"] = False
+    _s.generate_assistant = False
 
 # Store the tokens used in the prompt
 if "used_tokens" not in st.session_state:
-    st.session_state["used_tokens"] = 0
+    _s.used_tokens = 0
 
 # Retrieve the current models from ollama
 # Set a preferred model as default if there's none set
-models = st.session_state["chat_gateway"].list()
+models = _s.chat_gateway.list()
 if "model" not in st.session_state and PREFERRED_MODEL in models:
-    st.session_state["model"] = PREFERRED_MODEL
-_update_context_length(st.session_state["model"])
+    _s.model = PREFERRED_MODEL
+_update_context_length(_s.model)
 
 # Start a new chat if there isn't one active.
 # "New Chat" is implemented as `del st.session_state["chat"]`
 if "chat" not in st.session_state:
-    st.session_state["chat"] = new_chat(st.session_state["model"])
-    st.session_state["used_tokens"] = 0
+    _s.chat = new_chat(_s.model)
+    _s.used_tokens = 0
 
 
 #
@@ -287,14 +298,12 @@ with st.sidebar:
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = st.session_state["history_manager"].get_recent_chats(
-        limit=5
-    )
+    recent_chats = _s.history_manager.get_recent_chats(limit=5)
 
     for chat in recent_chats:
         # Highlight current chat
         icon = None
-        if chat["id"] == st.session_state["chat"].id:
+        if chat["id"] == _s.chat.id:
             icon = ":material/edit:"
         st.button(
             chat["title"],
@@ -331,7 +340,7 @@ with col2:
 
 with chat_col:
     # Display chat messages from history on app rerun
-    for message in st.session_state["chat"].messages:
+    for message in _s.chat.messages:
         if message["role"] == "system":
             with st.expander("View system prompt"):
                 st.markdown(message["content"])
@@ -349,8 +358,8 @@ with chat_col:
                 st.markdown(message["content"])
 
     # Generate a reply and add to history
-    if st.session_state["generate_assistant"]:
-        st.session_state["generate_assistant"] = False
+    if _s.generate_assistant:
+        _s.generate_assistant = False
 
         # Using the .empty() container ensures that once the
         # model starts returning content, we replace the spinner
@@ -360,7 +369,7 @@ with chat_col:
         with st.chat_message("assistant").empty():
             with st.spinner("Thinking...", show_time=False):
                 message = st.write_stream(stream_model_response())
-            st.session_state["chat"].messages.append(
+            _s.chat.messages.append(
                 {"role": "assistant", "content": message}
             )
             st.write(message)
@@ -368,13 +377,11 @@ with chat_col:
             st.rerun()
 
     # Allow user to regenerate the last response.
-    if st.session_state["chat"].messages[-1]["role"] == "assistant":
+    if _s.chat.messages[-1]["role"] == "assistant":
         left, right = st.columns([3, 1])
         with left:
             used_tokens_holder = st.empty()
-            used_tokens_holder.caption(
-                f"Used tokens: {st.session_state['used_tokens']}"
-            )
+            used_tokens_holder.caption(f"Used tokens: {_s.used_tokens}")
         with right:
             st.button(
                 "Regenerate",
@@ -391,8 +398,6 @@ st.chat_input(
 # Update the used tokens with the latest value after
 # generating a new response.
 try:
-    used_tokens_holder.caption(
-        f"Used tokens: {st.session_state['used_tokens']}"
-    )
+    used_tokens_holder.caption(f"Used tokens: {_s.used_tokens}")
 except NameError:
     pass
