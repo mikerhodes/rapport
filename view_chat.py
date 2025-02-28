@@ -1,4 +1,3 @@
-import textwrap
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -6,7 +5,7 @@ from typing import Dict, List, cast
 
 import streamlit as st
 
-from chatgateway import ChatGateway
+from chatgateway import ChatGateway, FinishReason
 from chatmodel import Chat, new_chat
 from chathistory import ChatHistoryManager
 
@@ -22,6 +21,7 @@ class State:
     generate_assistant: bool
     model: str
     history_manager: ChatHistoryManager
+    finish_reason: FinishReason
 
 
 # _s acts as a typed accessor for session state.
@@ -79,6 +79,8 @@ def stream_model_response():
     ):  # prompt eval count is the token count used from the model
         if chunk.used_tokens is not None:
             _s.used_tokens = chunk.used_tokens
+        if chunk.finish_reason is not None:
+            _s.finish_reason = chunk.finish_reason
         yield chunk.content
 
 
@@ -390,6 +392,16 @@ with chat_col:
                 type="tertiary",
                 icon=":material/refresh:",
             )
+
+try:
+    if _s.finish_reason == FinishReason.Length:
+        st.warning(
+            "Model stopped because maximum tokens reached.",
+            icon=":material/warning:",
+        )
+    del _s.finish_reason
+except AttributeError:
+    pass
 
 st.chat_input(
     "Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt
