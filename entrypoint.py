@@ -7,7 +7,7 @@ from chatmodel import PAGE_CHAT, PAGE_HISTORY
 from appconfig import ConfigStore
 
 
-base_dir = Path.home() / ".interlocution"
+base_dir = Path.home() / ".config" / "interlocution"
 base_dir.mkdir(exist_ok=True)
 
 if "config_store" not in st.session_state:
