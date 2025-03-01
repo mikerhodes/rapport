@@ -5,11 +5,10 @@ from typing import Dict, List, cast
 
 import streamlit as st
 
+from appconfig import ConfigStore
 from chatgateway import ChatGateway, FinishReason
 from chatmodel import Chat, new_chat
 from chathistory import ChatHistoryManager
-
-PREFERRED_MODEL = "phi4:latest"
 
 
 class State:
@@ -22,6 +21,7 @@ class State:
     model: str
     history_manager: ChatHistoryManager
     finish_reason: FinishReason
+    config_store: ConfigStore
 
 
 # _s acts as a typed accessor for session state.
@@ -158,6 +158,10 @@ def handle_change_model():
     _s.chat.model = model
     _update_context_length(model)
 
+    c = _s.config_store.load_config()
+    c.last_used_model = model
+    _s.config_store.save_config(c)
+
 
 def _update_context_length(model):
     m = _s.chat_gateway.show(model)
@@ -260,9 +264,13 @@ if "used_tokens" not in st.session_state:
 
 # Retrieve the current models from ollama
 # Set a preferred model as default if there's none set
+last_used_model = _s.config_store.load_config().last_used_model
 models = _s.chat_gateway.list()
-if "model" not in st.session_state and PREFERRED_MODEL in models:
-    _s.model = PREFERRED_MODEL
+if "model" not in st.session_state:
+    if last_used_model in models:
+        _s.model = last_used_model
+    else:
+        _s.model = models[0]
 _update_context_length(_s.model)
 
 # Start a new chat if there isn't one active.

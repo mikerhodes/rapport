@@ -5,15 +5,13 @@ from datetime import datetime, timedelta
 
 
 class ChatHistoryManager:
-    def __init__(self):
+    def __init__(self, base_dir: Path):
         # Ensure the .assistant directory exists
-        self.base_dir = Path.home() / ".interlocution"
-        self.chats_dir = self.base_dir / "chats"
-        self.base_dir.mkdir(exist_ok=True)
+        self.chats_dir = base_dir / "chats"
         self.chats_dir.mkdir(exist_ok=True)
 
         # Create an index file to track chat metadata
-        self.index_path = self.base_dir / "chat_index.json"
+        self.index_path = base_dir / "chat_index.json"
         if not self.index_path.exists():
             self._save_index({})
 

@@ -1,13 +1,22 @@
+from pathlib import Path
 import streamlit as st
 
 from chathistory import ChatHistoryManager
 from chatgateway import ChatGateway
 from chatmodel import PAGE_CHAT, PAGE_HISTORY
+from appconfig import ConfigStore
+
+
+base_dir = Path.home() / ".interlocution"
+base_dir.mkdir(exist_ok=True)
+
+if "config_store" not in st.session_state:
+    st.session_state["config_store"] = ConfigStore(base_dir / "config.json")
 
 
 # Initialize the chat history manager
 if "history_manager" not in st.session_state:
-    ch = ChatHistoryManager()
+    ch = ChatHistoryManager(base_dir)
     ch.clear_old_chats()  # clear on startup
     st.session_state["history_manager"] = ch
 
