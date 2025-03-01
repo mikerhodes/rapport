@@ -1,7 +1,7 @@
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from typing import Dict, List, cast
+from typing import Dict, List, cast, Optional
 
 import streamlit as st
 
@@ -22,6 +22,7 @@ class State:
     history_manager: ChatHistoryManager
     finish_reason: FinishReason
     config_store: ConfigStore
+    load_chat_with_id: Optional[str]
 
 
 # _s acts as a typed accessor for session state.
@@ -221,6 +222,7 @@ def load_chat(chat_id):
             created_at=datetime.fromisoformat(chat["created_at"]),
         )
         _s.model = chat["model"]
+        handle_change_model()
 
 
 def _chat_as_markdown() -> str:
@@ -272,6 +274,13 @@ if "model" not in st.session_state:
     else:
         _s.model = models[0]
 _update_context_length(_s.model)
+
+# Really need to figure something better for state defaults
+if "load_chat_with_id" not in st.session_state:
+    _s.load_chat_with_id = None
+if chat_id := _s.load_chat_with_id:
+    _s.load_chat_with_id = None
+    load_chat(chat_id)
 
 # Start a new chat if there isn't one active.
 # "New Chat" is implemented as `del st.session_state["chat"]`

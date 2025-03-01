@@ -22,15 +22,8 @@ def delete_chat(chat_id):
 
 def load_chat(chat_id):
     """Load a chat from history"""
-    chat = st.session_state["history_manager"].get_chat(chat_id)
-    if chat:
-        st.session_state["chat"] = Chat(
-            id=chat_id,
-            model=chat["model"],
-            messages=chat["messages"],
-            created_at=datetime.fromisoformat(chat["created_at"]),
-        )
-        st.session_state["switch_to_page"] = PAGE_CHAT
+    st.session_state["load_chat_with_id"] = chat_id
+    st.session_state["switch_to_page"] = PAGE_CHAT
 
 
 # Display recent chats
