@@ -7,7 +7,7 @@ import streamlit as st
 
 from appconfig import ConfigStore
 from chatgateway import ChatGateway, FinishReason
-from chatmodel import Chat, new_chat
+from chatmodel import PAGE_HISTORY, Chat, new_chat
 from chathistory import ChatHistoryManager
 
 
@@ -318,7 +318,7 @@ with st.sidebar:
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = _s.history_manager.get_recent_chats(limit=5)
+    recent_chats = _s.history_manager.get_recent_chats(limit=3)
 
     for chat in recent_chats:
         # Highlight current chat
@@ -333,6 +333,8 @@ with st.sidebar:
             use_container_width=True,
             icon=icon,
         )
+
+    st.page_link(PAGE_HISTORY, label="More chats ->")
 
 chat_col, col2 = st.columns([3, 1])
 
