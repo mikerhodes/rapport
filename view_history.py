@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import streamlit as st
 
 from chatmodel import PAGE_CHAT, Chat
@@ -26,7 +28,7 @@ def load_chat(chat_id):
             id=chat_id,
             model=chat["model"],
             messages=chat["messages"],
-            created_at=chat["created_at"],
+            created_at=datetime.fromisoformat(chat["created_at"]),
         )
         st.session_state["switch_to_page"] = PAGE_CHAT
 
