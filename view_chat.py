@@ -137,10 +137,11 @@ def _handle_submit_include(prompt: str):
 
 
 def handle_add_doc_to_chat():
-    stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
-    string_data = stringio.read()
-    ext = uploaded_file.name.split(".")[-1]
-    _insert_file_chat_message(string_data, uploaded_file.name, ext)
+    if uploaded_file:
+        stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
+        string_data = stringio.read()
+        ext = uploaded_file.name.split(".")[-1]
+        _insert_file_chat_message(string_data, uploaded_file.name, ext)
 
 
 def _insert_file_chat_message(data, fname, fext: str):
@@ -328,7 +329,7 @@ with st.sidebar:
             chat["title"],
             key=f"chat_{chat['id']}",
             on_click=load_chat,
-            args=[chat["id"]],
+            args=(chat["id"],),
             use_container_width=True,
             icon=icon,
         )
