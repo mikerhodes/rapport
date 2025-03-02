@@ -7,7 +7,16 @@ import streamlit as st
 
 from appconfig import ConfigStore
 from chatgateway import ChatGateway, FinishReason
-from chatmodel import PAGE_HISTORY, Chat, new_chat
+from chatmodel import (
+    PAGE_HISTORY,
+    AssistantMessage,
+    Chat,
+    IncludedFile,
+    MessageList,
+    SystemMessage,
+    UserMessage,
+    new_chat,
+)
 from chathistory import ChatHistoryManager
 
 
@@ -40,30 +49,36 @@ def clear_chat():
     # del st.session_state["chat"]
 
 
-def _prepare_messages_for_model(messages: List[Dict]):
+def _prepare_messages_for_model(
+    messages: MessageList,
+) -> List[Dict[str, str]]:
     """Converts message history format into format for model"""
     # Models like things in this order:
     # - System
     # - Files
     # - Chat
     # System and files for context, chat for the task
-    result = []
+    result: List[Dict[str, str]] = []
 
-    system = [m for m in messages if m["role"] == "system"]
-    file = [m for m in messages if m["role"] == "file"]
-    chat = [m for m in messages if m["role"] not in ["system", "file"]]
+    system = [m for m in messages if isinstance(m, SystemMessage)]
+    file = [m for m in messages if isinstance(m, IncludedFile)]
+    chat = [
+        m
+        for m in messages
+        if isinstance(m, AssistantMessage) or isinstance(m, UserMessage)
+    ]
 
-    result.extend(system)
+    result.extend([{"role": m.role, "content": m.message} for m in system])
     for m in file:
         # Models don't have a file role, so convert
         prompt = f"""
-        `{m["name"]}`
+        `{m.name}`
         ---
-        {m["data"]}
+        {m.data}
 
         ---"""
-        result.append({"role": "assistant", "content": prompt})
-    result.extend(chat)
+        result.append({"role": m.role, "content": prompt})
+    result.extend([{"role": m.role, "content": m.message} for m in chat])
     return result
 
 
@@ -104,7 +119,7 @@ def handle_submit_prompt():
 
 def _handle_submit_chat(prompt: str):
     """Handle the user submitting a general chat prompt"""
-    _s.chat.messages.append({"role": "user", "content": prompt})
+    _s.chat.messages.append(UserMessage(message=prompt))
     _s.generate_assistant = True
 
 
@@ -145,14 +160,7 @@ def handle_add_doc_to_chat():
 
 
 def _insert_file_chat_message(data, fname, fext: str):
-    _s.chat.messages.append(
-        {
-            "role": "file",
-            "name": fname,
-            "ext": fext,
-            "data": data,
-        }
-    )
+    _s.chat.messages.append(IncludedFile(name=fname, ext=fext, data=data))
 
 
 def handle_change_model():
@@ -182,13 +190,13 @@ def generate_chat_title():
     """Generate a title from the first 6 words of the first user message"""
     # Find first user message
     user_messages = [
-        msg for msg in _s.chat.messages if msg["role"] == "user"
+        msg for msg in _s.chat.messages if isinstance(msg, UserMessage)
     ]
     if not user_messages:
         return "New Chat"
 
     # Take first 6 words of first message
-    first_message = user_messages[0]["content"]
+    first_message = user_messages[0].message
     words = first_message.split()[:10]
     title = " ".join(words)
 
@@ -216,13 +224,8 @@ def load_chat(chat_id):
     """Load a chat from history"""
     chat = _s.history_manager.get_chat(chat_id)
     if chat:
-        _s.chat = Chat(
-            id=chat_id,
-            model=chat["model"],
-            messages=chat["messages"],
-            created_at=datetime.fromisoformat(chat["created_at"]),
-        )
-        _s.model = chat["model"]
+        _s.chat = chat
+        _s.model = chat.model
         handle_change_model()
 
 
@@ -235,19 +238,19 @@ def _chat_as_markdown() -> str:
     lines.append("---\n")
     lines.append(f"# {generate_chat_title()}\n")
     for m in chat.messages:
-        lines.append(f"**{m['role']}**\n")
-        if m["role"] == "file":
+        lines.append(f"**{m.role}**\n")
+        if isinstance(m, IncludedFile):
             lines.append(
                 f"""
-File `{m["name"]}` included in conversation:
+File `{m.name}` included in conversation:
 
-```{m["ext"]}
-{m["data"]}
+```{m.ext}
+{m.data}
 ```
                 """
             )
         else:
-            lines.append(m["content"])
+            lines.append(m.message)
         lines.append("\n")
     return "\n".join(lines)
 
@@ -363,21 +366,19 @@ with col2:
 with chat_col:
     # Display chat messages from history on app rerun
     for message in _s.chat.messages:
-        if message["role"] == "system":
+        if isinstance(message, SystemMessage):
             with st.expander("View system prompt"):
-                st.markdown(message["content"])
-        elif message["role"] == "file":
+                st.markdown(message.message)
+        elif isinstance(message, IncludedFile):
             with st.chat_message(
-                message["role"], avatar=":material/upload_file:"
+                message.role, avatar=":material/upload_file:"
             ):
-                st.markdown(f"Included `{message['name']}` in chat.")
+                st.markdown(f"Included `{message.name}` in chat.")
                 with st.expander("View file content"):
-                    st.markdown(
-                        f"```{message['ext']}\n{message['data']}\n```"
-                    )
+                    st.markdown(f"```{message.ext}\n{message.data}\n```")
         else:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+            with st.chat_message(message.role):
+                st.markdown(message.message)
 
     # Generate a reply and add to history
     if _s.generate_assistant:
@@ -391,15 +392,18 @@ with chat_col:
         with st.chat_message("assistant").empty():
             with st.spinner("Thinking...", show_time=False):
                 message = st.write_stream(stream_model_response())
-            _s.chat.messages.append(
-                {"role": "assistant", "content": message}
-            )
             st.write(message)
+            if isinstance(message, str):  # should always be
+                _s.chat.messages.append(AssistantMessage(message=message))
+            else:
+                st.error(
+                    "Could not add message to chat as unexpected return type"
+                )
             save_current_chat()
             st.rerun()
 
     # Allow user to regenerate the last response.
-    if _s.chat.messages[-1]["role"] == "assistant":
+    if isinstance(_s.chat.messages[-1], AssistantMessage):
         left, right = st.columns([3, 1])
         with left:
             used_tokens_holder = st.empty()

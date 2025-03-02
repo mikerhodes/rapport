@@ -15,6 +15,7 @@ dependencies = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+pythonVersion="3.12"
 
 [tool.ruff]
 line-length = 77

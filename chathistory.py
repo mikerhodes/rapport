@@ -1,7 +1,17 @@
+from dataclasses import asdict
 import json
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, cast
 from datetime import datetime, timedelta
+
+from chatmodel import (
+    AssistantMessage,
+    Chat,
+    IncludedFile,
+    MessageList,
+    SystemMessage,
+    UserMessage,
+)
 
 
 class ChatHistoryManager:
@@ -34,7 +44,7 @@ class ChatHistoryManager:
 
     def save_chat(
         self,
-        messages: List[Dict],
+        messages: MessageList,
         title: str,
         model: str,
         chat_id: str,
@@ -49,9 +59,11 @@ class ChatHistoryManager:
         chat_data = {
             "id": chat_id,
             "title": title,
-            "created_at": datetime.now().isoformat(),
+            "created_at": created_at.isoformat(),
             "model": model,
-            "messages": messages,
+            "messages": [
+                dict(type=type(m).__name__, **asdict(m)) for m in messages
+            ],
         }
 
         # Save chat to individual JSON file
@@ -81,12 +93,43 @@ class ChatHistoryManager:
 
         return sorted_chats
 
-    def get_chat(self, chat_id: str) -> Optional[Dict]:
+    def _parse_message(
+        self, dm: Dict
+    ) -> Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile]:
+        """Parse a message dict loaded from JSON into a concrete type."""
+        message_types = {
+            "SystemMessage": SystemMessage,
+            "UserMessage": UserMessage,
+            "AssistantMessage": AssistantMessage,
+            "IncludedFile": IncludedFile,
+        }
+
+        message_class = message_types.get(dm["type"])
+        if not message_class:
+            raise ValueError(f"Unknown message type: {dm['type']}")
+
+        if message_class in (SystemMessage, UserMessage, AssistantMessage):
+            return message_class(message=dm["message"])
+        elif message_class == IncludedFile:
+            return message_class(
+                name=dm["name"], ext=dm["ext"], data=dm["data"]
+            )
+        else:  # maybe there's some way to make the type checker happier
+            raise ValueError(f"Unknown message type: {dm['type']}")
+
+    def get_chat(self, chat_id: str) -> Optional[Chat]:
         """Retrieve a specific chat from its JSON file"""
         chat_path = self.chats_dir / f"{chat_id}.json"
         try:
             with open(chat_path, "r") as f:
-                return json.load(f)
+                d = cast(Dict, json.load(f))
+                messages = [self._parse_message(dm) for dm in d["messages"]]
+                return Chat(
+                    id=chat_id,
+                    model=d["model"],
+                    messages=messages,
+                    created_at=datetime.fromisoformat(d["created_at"]),
+                )
         except FileNotFoundError:
             return None
 
