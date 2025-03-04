@@ -20,6 +20,14 @@ Libraries:
 
 ## Getting started
 
+### Anthropic
+
+To enable Anthropic models, set an `ANTHROPIC_API_KEY` environment variable to your Anthropic API key.
+
+### Watsonx
+
+To enable watsonx models, set both `WATSONX_IAM_API_KEY` and `WATSONX_PROJECT` environment variables to an IAM API key (such as a personal API key) and watsonx project respectively. The watsonx project must have an associate watsonx Runtime to work (the Runtime is what runs inference, and other things, in watsonx).
+
 ### Ollama
 
 There are many guides on the internet for installing Ollama. But I did this to install the server itself directly from GitHub:
