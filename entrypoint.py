@@ -7,7 +7,7 @@ from chatmodel import PAGE_CHAT, PAGE_HISTORY
 from appconfig import ConfigStore
 
 
-base_dir = Path.home() / ".config" / "interlocution"
+base_dir = Path.home() / ".config" / "rapport"
 base_dir.mkdir(exist_ok=True)
 
 if "config_store" not in st.session_state:
@@ -42,6 +42,6 @@ pg = st.navigation(
     ]
 )
 st.set_page_config(
-    page_title="Interlocution", page_icon=":robot_face:", layout="wide"
+    page_title="Rapport", page_icon=":robot_face:", layout="wide"
 )
 pg.run()
