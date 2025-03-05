@@ -361,19 +361,18 @@ with col2:
 with chat_col:
     # Display chat messages from history on app rerun
     for message in _s.chat.messages:
-        if isinstance(message, SystemMessage):
-            with st.expander("View system prompt"):
-                st.markdown(message.message)
-        elif isinstance(message, IncludedFile):
-            with st.chat_message(
-                message.role, avatar=":material/upload_file:"
-            ):
-                st.markdown(f"Included `{message.name}` in chat.")
-                with st.expander("View file content"):
-                    st.markdown(f"```{message.ext}\n{message.data}\n```")
-        else:
-            with st.chat_message(message.role):
-                st.markdown(message.message)
+        match message:
+            case SystemMessage(message=message):
+                with st.expander("View system prompt"):
+                    st.markdown(message)
+            case IncludedFile(name=name, ext=ext, data=data, role=role):
+                with st.chat_message(role, avatar=":material/upload_file:"):
+                    st.markdown(f"Included `{name}` in chat.")
+                    with st.expander("View file content"):
+                        st.markdown(f"```{ext}\n{data}\n```")
+            case AssistantMessage() | UserMessage():
+                with st.chat_message(message.role):
+                    st.markdown(message.message)
 
     # Generate a reply and add to history
     if _s.generate_assistant:
