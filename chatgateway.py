@@ -258,16 +258,11 @@ class WatsonxAdaptor(ChatAdaptor):
             "meta-llama/llama-3-3-70b-instruct",
         ]
 
-    def _client(self):
-        if self.c:
-            return self.c
-
         credentials = wai.Credentials(
             url="https://eu-gb.ml.cloud.ibm.com",
             api_key=self.apikey,
         )
         self.c = wai.APIClient(credentials)
-        return self.c
 
     def list(self) -> List[str]:
         return self.models
@@ -291,7 +286,7 @@ class WatsonxAdaptor(ChatAdaptor):
         verify = True
         fmodel = waifm.ModelInference(
             model_id=model,
-            api_client=self._client(),
+            api_client=self.c,
             params=params,
             project_id=self.project_id,
             space_id=self.space_id,
