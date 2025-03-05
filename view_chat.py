@@ -122,6 +122,8 @@ def handle_submit_prompt():
     else:
         _handle_submit_chat(prompt.text)
 
+    save_current_chat()
+
 
 def _handle_submit_chat(prompt: str):
     """Handle the user submitting a general chat prompt"""
@@ -394,7 +396,7 @@ with chat_col:
                     "Could not add message to chat as unexpected return type"
                 )
             save_current_chat()
-            st.rerun()
+            # st.rerun()
 
     # Allow user to regenerate the last response.
     if isinstance(_s.chat.messages[-1], AssistantMessage):
