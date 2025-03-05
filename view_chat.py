@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Dict, List, cast, Optional
 
 import streamlit as st
+from streamlit.elements.widgets.chat import ChatInputValue
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from appconfig import ConfigStore
 from chatgateway import ChatGateway, FinishReason
@@ -21,7 +23,7 @@ from chathistory import ChatHistoryManager
 
 class State:
     chat: Chat
-    user_prompt: str
+    user_prompt: ChatInputValue
     chat_gateway: ChatGateway
     model_context_length: int
     used_tokens: int
@@ -109,11 +111,16 @@ def regenerate_last_response():
 def handle_submit_prompt():
     # add latest message to history in format {role, content}
     prompt = _s.user_prompt
-    # prompt = st.session_state["user_prompt"]
-    if prompt.startswith("/include"):
-        _handle_submit_include(prompt)
+
+    for f in prompt.files:
+        data = StringIO(f.getvalue().decode("utf-8")).read()
+        ext = f.name.split(".")[-1]
+        _insert_file_chat_message(data, f.name, ext)
+
+    if prompt.text.startswith("/include"):
+        _handle_submit_include(prompt.text)
     else:
-        _handle_submit_chat(prompt)
+        _handle_submit_chat(prompt.text)
 
 
 def _handle_submit_chat(prompt: str):
@@ -148,14 +155,6 @@ def _handle_submit_include(prompt: str):
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             st.toast(f"An unexpected error occurred uploading the file: {e}")
-
-
-def handle_add_doc_to_chat():
-    if uploaded_file:
-        stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
-        string_data = stringio.read()
-        ext = uploaded_file.name.split(".")[-1]
-        _insert_file_chat_message(string_data, uploaded_file.name, ext)
 
 
 def _insert_file_chat_message(data, fname, fext: str):
@@ -342,11 +341,6 @@ with st.sidebar:
 chat_col, col2 = st.columns([3, 1])
 
 with col2:
-    with st.expander("Upload a file"):
-        uploaded_file = st.file_uploader(
-            "Upload a plain text, markdown or code file"
-        )
-        st.button("Add to Chat", on_click=handle_add_doc_to_chat)
     st.markdown("""
         Slash commands:
 
@@ -389,7 +383,7 @@ with chat_col:
         # with the streamed content. We then also need to write
         # out the full message at the end (for some reason
         # the message otherwise disappears).
-        with st.chat_message("assistant").empty():
+        with st.chat_message("assistant"), st.empty():
             with st.spinner("Thinking...", show_time=False):
                 message = st.write_stream(stream_model_response())
             st.write(message)
@@ -428,7 +422,10 @@ except AttributeError:
     pass
 
 st.chat_input(
-    "Enter prompt here...", key="user_prompt", on_submit=handle_submit_prompt
+    "Enter prompt here...",
+    key="user_prompt",
+    on_submit=handle_submit_prompt,
+    accept_file=True,
 )
 
 # Update the used tokens with the latest value after
