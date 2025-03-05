@@ -310,6 +310,7 @@ with st.sidebar:
         file_name="conversation.md",
         use_container_width=True,
         icon=":material/download:",
+        on_click="ignore",
     )
     st.selectbox(
         "Choose your model",
