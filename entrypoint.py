@@ -10,19 +10,6 @@ from appconfig import ConfigStore
 base_dir = Path.home() / ".config" / "rapport"
 base_dir.mkdir(exist_ok=True)
 
-if "config_store" not in st.session_state:
-    st.session_state["config_store"] = ConfigStore(base_dir / "config.json")
-
-
-# Initialize the chat history manager
-if "history_manager" not in st.session_state:
-    ch = ChatHistoryManager(base_dir)
-    ch.clear_old_chats()  # clear on startup
-    st.session_state["history_manager"] = ch
-
-if "chat_gateway" not in st.session_state:
-    print("Init chat gateway")
-    st.session_state["chat_gateway"] = ChatGateway()
 
 # Callbacks use switch_to_page to do navigation,
 # as st.switch_path doesn't work from callbacks.
@@ -44,4 +31,18 @@ pg = st.navigation(
 st.set_page_config(
     page_title="Rapport", page_icon=":robot_face:", layout="wide"
 )
+
+# TODO: why, when I put any of these into @st.cache_resource,
+# does the first chat message of the first chat in a session
+# end up with stale components outside the sidebar?
+# So for now these remain created per session to avoid ugliness.
+if "config_store" not in st.session_state:
+    st.session_state["config_store"] = ConfigStore(base_dir / "config.json")
+if "history_manager" not in st.session_state:
+    ch = ChatHistoryManager(base_dir)
+    st.session_state["history_manager"] = ch
+if "chat_gateway" not in st.session_state:
+    print("Init chat gateway")
+    st.session_state["chat_gateway"] = ChatGateway()
+
 pg.run()
