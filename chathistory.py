@@ -25,6 +25,8 @@ class ChatHistoryManager:
         if not self.index_path.exists():
             self._save_index({})
 
+        self.clear_old_chats()  # clear on startup
+
     def _save_index(self, index: Dict):
         """Save the chat index file"""
         with open(self.index_path, "w") as f:
