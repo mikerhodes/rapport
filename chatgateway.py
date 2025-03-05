@@ -206,23 +206,27 @@ class AnthropicAdaptor(ChatAdaptor):
             stream=True,
             system=system_prompt,
         )
+        input_tokens = 0
         for event in chunk_stream:
             # print(event.type)
             content = ""
             finish_reason = None
             used_tokens = None
-            if (
-                event.type == "content_block_delta"
-                and event.delta.type == "text_delta"
-            ):
-                content = event.delta.text
-            elif event.type == "message_delta":
-                used_tokens = event.usage.output_tokens
-                match event.delta.stop_reason:
-                    case "max_tokens":
-                        finish_reason = FinishReason.Length
-                    case _:
-                        finish_reason = FinishReason.Stop
+
+            match event.type:
+                case "message_start":
+                    input_tokens = event.message.usage.input_tokens
+                case "content_block_delta" if (
+                    event.delta.type == "text_delta"
+                ):
+                    content = event.delta.text
+                case "message_delta":
+                    used_tokens = input_tokens + event.usage.output_tokens
+                    match event.delta.stop_reason:
+                        case "max_tokens":
+                            finish_reason = FinishReason.Length
+                        case _:
+                            finish_reason = FinishReason.Stop
 
             yield MessageChunk(
                 content=content,
