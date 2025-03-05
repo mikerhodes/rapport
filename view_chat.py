@@ -306,7 +306,8 @@ with st.sidebar:
     st.download_button(
         "Download chat",
         _chat_as_markdown(),
-        file_name="conversation.md",
+        file_name="rapport_download.md",
+        mime="text/markdown",
         use_container_width=True,
         icon=":material/download:",
         on_click="ignore",
