@@ -422,10 +422,3 @@ st.chat_input(
     on_submit=handle_submit_prompt,
     accept_file=True,
 )
-
-# Update the used tokens with the latest value after
-# generating a new response.
-try:
-    used_tokens_holder.caption(f"Used tokens: {_s.used_tokens}")
-except NameError:
-    pass
