@@ -48,6 +48,7 @@ class Chat:
     model: str
     messages: MessageList
     created_at: datetime
+    title: str = field(default="New Chat")
     id: str = field(
         default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
     )

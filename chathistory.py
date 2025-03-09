@@ -8,7 +8,6 @@ from chatmodel import (
     AssistantMessage,
     Chat,
     IncludedFile,
-    MessageList,
     SystemMessage,
     UserMessage,
 )
@@ -46,11 +45,7 @@ class ChatHistoryManager:
 
     def save_chat(
         self,
-        messages: MessageList,
-        title: str,
-        model: str,
-        chat_id: str,
-        created_at: datetime,
+        chat: Chat,
     ):
         """
         Save a chat session to a JSON file.
@@ -59,26 +54,27 @@ class ChatHistoryManager:
         """
         # Create chat data structure
         chat_data = {
-            "id": chat_id,
-            "title": title,
-            "created_at": created_at.isoformat(),
-            "model": model,
+            "id": chat.id,
+            "title": chat.title,
+            "created_at": chat.created_at.isoformat(),
+            "model": chat.model,
             "messages": [
-                dict(type=type(m).__name__, **asdict(m)) for m in messages
+                dict(type=type(m).__name__, **asdict(m))
+                for m in chat.messages
             ],
         }
 
         # Save chat to individual JSON file
-        chat_path = self.chats_dir / f"{chat_id}.json"
+        chat_path = self.chats_dir / f"{chat.id}.json"
         with open(chat_path, "w") as f:
             json.dump(chat_data, f, indent=2)
 
         # Update index
         index = self._load_index()
-        index[chat_id] = {
-            "title": title,
-            "created_at": chat_data["created_at"],
-            "model": model,
+        index[chat.id] = {
+            "title": chat.title,
+            "created_at": chat.created_at.isoformat(),
+            "model": chat.model,
         }
         self._save_index(index)
 

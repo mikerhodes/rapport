@@ -4,7 +4,6 @@ from typing import Dict, List, cast, Optional
 
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from appconfig import ConfigStore
 from chatgateway import ChatGateway, FinishReason
@@ -186,14 +185,14 @@ def _update_context_length(model):
 #
 
 
-def generate_chat_title():
-    """Generate a title from the first 6 words of the first user message"""
+def generate_chat_title(chat: Chat) -> str:
+    """Generate a title from the first few words of the first user message"""
     # Find first user message
     user_messages = [
-        msg for msg in _s.chat.messages if isinstance(msg, UserMessage)
+        msg for msg in chat.messages if isinstance(msg, UserMessage)
     ]
     if not user_messages:
-        return "New Chat"
+        return chat.title  # return existing title if can't do better
 
     # Take first 6 words of first message
     first_message = user_messages[0].message
@@ -210,14 +209,8 @@ def generate_chat_title():
 def save_current_chat():
     """Save the current chat session"""
     if len(_s.chat.messages) > 1:  # More than just system message
-        title = generate_chat_title()
-        _s.history_manager.save_chat(
-            _s.chat.messages,
-            title,
-            _s.chat.model,
-            _s.chat.id,
-            _s.chat.created_at,
-        )
+        _s.chat.title = generate_chat_title(_s.chat)
+        _s.history_manager.save_chat(_s.chat)
 
 
 def load_chat(chat_id):
@@ -236,7 +229,7 @@ def _chat_as_markdown() -> str:
     lines.append("model: " + chat.model)
     lines.append("created_at: " + chat.created_at.isoformat())
     lines.append("---\n")
-    lines.append(f"# {generate_chat_title()}\n")
+    lines.append(f"# {generate_chat_title(chat)}\n")
     for m in chat.messages:
         lines.append(f"**{m.role}**\n")
         if isinstance(m, IncludedFile):
