@@ -10,6 +10,14 @@ from anthropic import Anthropic
 from anthropic.types import MessageParam
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 
+from chatmodel import (
+    AssistantMessage,
+    IncludedFile,
+    MessageList,
+    SystemMessage,
+    UserMessage,
+)
+
 
 class FinishReason(Enum):
     Stop = auto()
@@ -94,13 +102,13 @@ class ChatGateway:
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: MessageList,
         num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
         response = c.chat(
             model=model,
-            messages=messages,
+            messages=_prepare_messages_for_model(messages),
             num_ctx=num_ctx,
         )
         for chunk in response:
@@ -109,6 +117,43 @@ class ChatGateway:
     def show(self, model: str) -> Optional[ModelInfo]:
         c = self.model_to_client[model]
         return c.show(model)
+
+
+def _prepare_messages_for_model(
+    messages: MessageList,
+) -> List[Dict[str, str]]:
+    """
+    Converts message history format into format for model.
+    This implementation is generic. More advanced versions could
+    be implemented for multi-modal models like Claude.
+    """
+    # Models like things in this order:
+    # - System
+    # - Files
+    # - Chat
+    # System and files for context, chat for the task
+    result: List[Dict[str, str]] = []
+
+    system = [m for m in messages if isinstance(m, SystemMessage)]
+    file = [m for m in messages if isinstance(m, IncludedFile)]
+    chat = [
+        m
+        for m in messages
+        if isinstance(m, AssistantMessage) or isinstance(m, UserMessage)
+    ]
+
+    result.extend([{"role": m.role, "content": m.message} for m in system])
+    for m in file:
+        # Models don't have a file role, so convert
+        prompt = f"""
+        `{m.name}`
+        ---
+        {m.data}
+
+        ---"""
+        result.append({"role": m.role, "content": prompt})
+    result.extend([{"role": m.role, "content": m.message} for m in chat])
+    return result
 
 
 class OllamaAdaptor(ChatAdaptor):

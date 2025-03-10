@@ -1,6 +1,6 @@
 from io import StringIO
 from pathlib import Path
-from typing import Dict, List, cast, Optional
+from typing import cast, Optional
 
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
@@ -12,7 +12,6 @@ from chatmodel import (
     AssistantMessage,
     Chat,
     IncludedFile,
-    MessageList,
     SystemMessage,
     UserMessage,
     new_chat,
@@ -49,45 +48,12 @@ def clear_chat():
     # del st.session_state["chat"]
 
 
-def _prepare_messages_for_model(
-    messages: MessageList,
-) -> List[Dict[str, str]]:
-    """Converts message history format into format for model"""
-    # Models like things in this order:
-    # - System
-    # - Files
-    # - Chat
-    # System and files for context, chat for the task
-    result: List[Dict[str, str]] = []
-
-    system = [m for m in messages if isinstance(m, SystemMessage)]
-    file = [m for m in messages if isinstance(m, IncludedFile)]
-    chat = [
-        m
-        for m in messages
-        if isinstance(m, AssistantMessage) or isinstance(m, UserMessage)
-    ]
-
-    result.extend([{"role": m.role, "content": m.message} for m in system])
-    for m in file:
-        # Models don't have a file role, so convert
-        prompt = f"""
-        `{m.name}`
-        ---
-        {m.data}
-
-        ---"""
-        result.append({"role": m.role, "content": prompt})
-    result.extend([{"role": m.role, "content": m.message} for m in chat])
-    return result
-
-
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
     # cg = cast(ChatGateway, st.session_state["chat_gateway"])
     response = _s.chat_gateway.chat(
         model=_s.chat.model,
-        messages=_prepare_messages_for_model(_s.chat.messages),
+        messages=_s.chat.messages,
         num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in (
