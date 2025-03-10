@@ -149,7 +149,7 @@ class ChatHistoryManager:
         except FileNotFoundError:
             return False
 
-    def clear_old_chats(self, days: int = 7) -> int:
+    def clear_old_chats(self, days: int = 90) -> int:
         """
         Delete chat files and entries from the index that are older than a specified number of days.
 
