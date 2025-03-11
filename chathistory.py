@@ -124,6 +124,7 @@ class ChatHistoryManager:
                 messages = [self._parse_message(dm) for dm in d["messages"]]
                 return Chat(
                     id=chat_id,
+                    title=d["title"],
                     model=d["model"],
                     messages=messages,
                     created_at=datetime.fromisoformat(d["created_at"]),
