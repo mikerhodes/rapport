@@ -257,6 +257,17 @@ if "chat" not in st.session_state:
 #
 
 
+def _handle_obsidian_download():
+    p = _s.config_store.load_config().obsidian_directory
+    if p:
+        p = Path(p) / f"{_s.chat.title}-{_s.chat.id}.md"
+        with open(p, "w") as f:
+            f.write(_chat_as_markdown())
+        st.success("Saved to Obsidian")
+    else:
+        st.error("Path not set")
+
+
 with st.sidebar:
     st.button(
         "New Chat",
@@ -264,15 +275,25 @@ with st.sidebar:
         icon=":material/edit_square:",
         use_container_width=True,
     )
-    st.download_button(
-        "Download chat",
-        _chat_as_markdown(),
-        file_name="rapport_download.md",
-        mime="text/markdown",
-        use_container_width=True,
-        icon=":material/download:",
-        on_click="ignore",
-    )
+    dcol1, dcol2 = st.columns(2)
+    with dcol1:
+        st.download_button(
+            "Download",
+            _chat_as_markdown(),
+            file_name="rapport_download.md",
+            mime="text/markdown",
+            use_container_width=True,
+            icon=":material/download:",
+            on_click="ignore",
+        )
+    with dcol2:
+        if _s.config_store.load_config().obsidian_directory:
+            st.button(
+                "Obsidian",
+                on_click=_handle_obsidian_download,
+                icon=":material/download:",
+                use_container_width=True,
+            )
     st.selectbox(
         "Choose your model",
         models,
@@ -282,7 +303,7 @@ with st.sidebar:
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = _s.history_manager.get_recent_chats(limit=3)
+    recent_chats = _s.history_manager.get_recent_chats(limit=2)
 
     for chat in recent_chats:
         # Highlight current chat
@@ -345,17 +366,23 @@ with chat_col:
         # out the full message at the end (for some reason
         # the message otherwise disappears).
         with st.chat_message("assistant"), st.empty():
-            with st.spinner("Thinking...", show_time=False):
-                message = st.write_stream(stream_model_response())
-            st.write(message)
-            if isinstance(message, str):  # should always be
-                _s.chat.messages.append(AssistantMessage(message=message))
-            else:
-                st.error(
-                    "Could not add message to chat as unexpected return type"
-                )
-            save_current_chat()
-            # st.rerun()
+            try:
+                with st.spinner("Thinking...", show_time=False):
+                    message = st.write_stream(stream_model_response())
+                st.write(message)
+                if isinstance(message, str):  # should always be
+                    _s.chat.messages.append(
+                        AssistantMessage(message=message)
+                    )
+                else:
+                    st.error(
+                        "Could not add message to chat as unexpected return type"
+                    )
+                save_current_chat()
+                # st.rerun()
+            except Exception as e:
+                print("The server could not be reached")
+                st.error(e)
 
     # Allow user to regenerate the last response.
     if isinstance(_s.chat.messages[-1], AssistantMessage):
@@ -386,5 +413,5 @@ st.chat_input(
     "Enter prompt here...",
     key="user_prompt",
     on_submit=handle_submit_prompt,
-    accept_file=True,
+    accept_file="multiple",
 )
