@@ -6,6 +6,8 @@ from typing import Optional
 
 @dataclass
 class Config:
+    preferred_model: Optional[str] = field(default=None)
+    obsidian_directory: Optional[str] = field(default=None)
     last_used_model: Optional[str] = field(default=None)
 
 

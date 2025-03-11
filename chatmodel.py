@@ -10,6 +10,7 @@ from typing import Union, List
 
 PAGE_CHAT = "view_chat.py"
 PAGE_HISTORY = "view_history.py"
+PAGE_CONFIG = "view_config.py"
 
 
 @dataclass

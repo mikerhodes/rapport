@@ -3,7 +3,7 @@ import streamlit as st
 
 from chathistory import ChatHistoryManager
 from chatgateway import ChatGateway
-from chatmodel import PAGE_CHAT, PAGE_HISTORY
+from chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HISTORY
 from appconfig import ConfigStore
 
 
@@ -26,6 +26,7 @@ pg = st.navigation(
     [
         st.Page(PAGE_CHAT, title="Chat", icon=":material/chat_bubble:"),
         st.Page(PAGE_HISTORY, title="History", icon=":material/history:"),
+        st.Page(PAGE_CONFIG, title="Settings", icon=":material/settings:"),
     ]
 )
 st.set_page_config(
