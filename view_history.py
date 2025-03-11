@@ -27,7 +27,7 @@ def load_chat(chat_id):
 
 
 # Display recent chats
-st.markdown("## History")
+st.title("History")
 recent_chats = st.session_state["history_manager"].get_recent_chats(
     limit=100
 )
