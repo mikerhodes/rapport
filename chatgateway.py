@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from enum import Enum, auto
+import logging
 from typing import Dict, Generator, List, Optional, Protocol
 
 import ibm_watsonx_ai as wai
@@ -17,6 +18,8 @@ from chatmodel import (
     SystemMessage,
     UserMessage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class FinishReason(Enum):
@@ -78,7 +81,7 @@ class ChatGateway:
             for m in oa.list():
                 self.model_to_client[m] = oa
         except ConnectionError:
-            print("Warning: Ollama not running; cannot use ollama models")
+            logger.info("Ollama not running; cannot use ollama models")
 
         try:
             aa = AnthropicAdaptor()
@@ -86,7 +89,7 @@ class ChatGateway:
             for m in aa.list():
                 self.model_to_client[m] = aa
         except MissingEnvVarException as ex:
-            print(f"Warning: {ex}; cannot use Anthropic models")
+            logger.info(f"Warning: {ex}; cannot use Anthropic models")
 
         try:
             wa = WatsonxAdaptor()
@@ -94,7 +97,7 @@ class ChatGateway:
             for m in wa.list():
                 self.model_to_client[m] = wa
         except MissingEnvVarException as ex:
-            print(f"Warning: {ex}; cannot use watsonx models")
+            logger.info(f"Warning: {ex}; cannot use watsonx models")
 
     def list(self) -> List[str]:
         return self.models
@@ -253,7 +256,7 @@ class AnthropicAdaptor(ChatAdaptor):
         )
         input_tokens = 0
         for event in chunk_stream:
-            # print(event.type)
+            # logger.info(event.type)
             content = ""
             finish_reason = None
             used_tokens = None

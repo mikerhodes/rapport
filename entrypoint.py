@@ -1,10 +1,14 @@
+import logging
 from pathlib import Path
+
 import streamlit as st
 
 from chathistory import ChatHistoryManager
 from chatgateway import ChatGateway
 from chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HISTORY
 from appconfig import ConfigStore
+
+logging.basicConfig(level=logging.INFO)
 
 
 base_dir = Path.home() / ".config" / "rapport"
