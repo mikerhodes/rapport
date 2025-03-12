@@ -273,35 +273,36 @@ if "chat" not in st.session_state:
 
 
 with st.sidebar:
-    st.button(
-        "New Chat",
-        on_click=clear_chat,
-        icon=":material/edit_square:",
-        use_container_width=True,
-    )
-    dcol1, dcol2 = st.columns(2)
-    with dcol1:
-        st.download_button(
-            "Download",
-            _chat_as_markdown(),
-            file_name="rapport_download.md",
-            mime="text/markdown",
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.button(
+            "New Chat",
+            on_click=clear_chat,
+            icon=":material/edit_square:",
             use_container_width=True,
-            icon=":material/download:",
-            on_click="ignore",
-            disabled=len(_s.chat.messages) < 2,
         )
-    with dcol2:
-        if _s.config_store.load_config().obsidian_directory:
-            st.button(
-                "Obsidian",
-                on_click=_handle_obsidian_download,
-                icon=":material/check:"
-                if _s.chat.export_location
-                else ":material/add_circle:",
+    with c2:
+        with st.popover("", icon=":material/export_notes:"):
+            st.download_button(
+                "Download",
+                _chat_as_markdown(),
+                file_name="rapport_download.md",
+                mime="text/markdown",
                 use_container_width=True,
+                icon=":material/download:",
+                on_click="ignore",
                 disabled=len(_s.chat.messages) < 2,
             )
+            if _s.config_store.load_config().obsidian_directory:
+                st.button(
+                    "Obsidian",
+                    on_click=_handle_obsidian_download,
+                    icon=":material/check:"
+                    if _s.chat.export_location
+                    else ":material/add_circle:",
+                    use_container_width=True,
+                    disabled=len(_s.chat.messages) < 2,
+                )
     st.selectbox(
         "Choose your model",
         models,
@@ -311,7 +312,7 @@ with st.sidebar:
 
     # Display recent chats
     st.markdown("## Recent Chats")
-    recent_chats = _s.history_manager.get_recent_chats(limit=2)
+    recent_chats = _s.history_manager.get_recent_chats(limit=3)
 
     for chat in recent_chats:
         # Highlight current chat
