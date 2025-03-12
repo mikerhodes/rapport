@@ -173,10 +173,13 @@ def generate_chat_title(chat: Chat) -> str:
 
 
 def save_current_chat():
-    """Save the current chat session"""
+    """Save the current chat session, writing to export file if set too."""
     if len(_s.chat.messages) > 1:  # More than just system message
         _s.chat.title = generate_chat_title(_s.chat)
         _s.history_manager.save_chat(_s.chat)
+        if p := _s.chat.export_location:
+            with open(p, "w") as f:
+                f.write(_chat_as_markdown())
 
 
 def load_chat(chat_id):
@@ -186,6 +189,18 @@ def load_chat(chat_id):
         _s.chat = chat
         _s.model = chat.model
         handle_change_model()
+
+
+def _handle_obsidian_download():
+    p = _s.config_store.load_config().obsidian_directory
+    if p:
+        p = Path(p) / f"{_s.chat.title}-{_s.chat.id}.md"
+        _s.chat.export_location = p
+        save_current_chat()  # this also writes the obsidian file
+        st.toast("Saved to Obsidian")
+
+    else:
+        st.toast("Path not set")
 
 
 def _chat_as_markdown() -> str:
@@ -257,17 +272,6 @@ if "chat" not in st.session_state:
 #
 
 
-def _handle_obsidian_download():
-    p = _s.config_store.load_config().obsidian_directory
-    if p:
-        p = Path(p) / f"{_s.chat.title}-{_s.chat.id}.md"
-        with open(p, "w") as f:
-            f.write(_chat_as_markdown())
-        st.success("Saved to Obsidian")
-    else:
-        st.error("Path not set")
-
-
 with st.sidebar:
     st.button(
         "New Chat",
@@ -285,14 +289,18 @@ with st.sidebar:
             use_container_width=True,
             icon=":material/download:",
             on_click="ignore",
+            disabled=len(_s.chat.messages) < 2,
         )
     with dcol2:
         if _s.config_store.load_config().obsidian_directory:
             st.button(
                 "Obsidian",
                 on_click=_handle_obsidian_download,
-                icon=":material/download:",
+                icon=":material/check:"
+                if _s.chat.export_location
+                else ":material/add_circle:",
                 use_container_width=True,
+                disabled=len(_s.chat.messages) < 2,
             )
     st.selectbox(
         "Choose your model",

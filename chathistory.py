@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import List, Dict, Optional, Union, cast
 from datetime import datetime, timedelta
+import logging
 
 from chatmodel import (
     AssistantMessage,
@@ -11,6 +12,8 @@ from chatmodel import (
     SystemMessage,
     UserMessage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ChatHistoryManager:
@@ -58,6 +61,7 @@ class ChatHistoryManager:
             "title": chat.title,
             "created_at": chat.created_at.isoformat(),
             "model": chat.model,
+            "export_location": str(chat.export_location),
             "messages": [
                 dict(type=type(m).__name__, **asdict(m))
                 for m in chat.messages
@@ -68,6 +72,7 @@ class ChatHistoryManager:
         chat_path = self.chats_dir / f"{chat.id}.json"
         with open(chat_path, "w") as f:
             json.dump(chat_data, f, indent=2)
+        logger.info("Saved chat to %s", chat_path)
 
         # Update index
         index = self._load_index()
@@ -119,16 +124,20 @@ class ChatHistoryManager:
         """Retrieve a specific chat from its JSON file"""
         chat_path = self.chats_dir / f"{chat_id}.json"
         try:
+            logger.info("Loading chat from %s", chat_path)
             with open(chat_path, "r") as f:
                 d = cast(Dict, json.load(f))
                 messages = [self._parse_message(dm) for dm in d["messages"]]
-                return Chat(
+                c = Chat(
                     id=chat_id,
                     title=d["title"],
                     model=d["model"],
                     messages=messages,
                     created_at=datetime.fromisoformat(d["created_at"]),
                 )
+                if p := d.get("export_location", None):
+                    c.export_location = Path(p)
+                return c
         except FileNotFoundError:
             return None
 

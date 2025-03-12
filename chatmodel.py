@@ -6,7 +6,8 @@ Trying to keep this indepdent from streamlit.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Union, List
+from pathlib import Path
+from typing import Union, List, Optional
 
 PAGE_CHAT = "view_chat.py"
 PAGE_HISTORY = "view_history.py"
@@ -53,6 +54,7 @@ class Chat:
     id: str = field(
         default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
     )
+    export_location: Optional[Path] = field(default=None)
 
 
 def new_chat(model: str) -> Chat:
