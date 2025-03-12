@@ -1,5 +1,6 @@
 from io import StringIO
 from pathlib import Path
+import subprocess
 from typing import cast, Optional
 
 import streamlit as st
@@ -203,6 +204,16 @@ def _handle_obsidian_download():
         st.toast("Path not set")
 
 
+def _handle_copy_to_clipboard():
+    """Use pbcopy to copy to clipboard"""
+    # TODO support other OSs.
+    p = subprocess.Popen(
+        ["pbcopy", "w"], stdin=subprocess.PIPE, close_fds=True
+    )
+    p.communicate(input=_chat_as_markdown().encode("utf-8"))
+    st.toast("Copied to clipboard")
+
+
 def _chat_as_markdown() -> str:
     chat = _s.chat
     lines = []
@@ -282,7 +293,11 @@ with st.sidebar:
             use_container_width=True,
         )
     with c2:
-        with st.popover("", icon=":material/export_notes:"):
+        with st.popover(
+            "",
+            icon=":material/export_notes:",
+            disabled=len(_s.chat.messages) < 2,
+        ):
             st.download_button(
                 "Download",
                 _chat_as_markdown(),
@@ -291,7 +306,6 @@ with st.sidebar:
                 use_container_width=True,
                 icon=":material/download:",
                 on_click="ignore",
-                disabled=len(_s.chat.messages) < 2,
             )
             if _s.config_store.load_config().obsidian_directory:
                 st.button(
@@ -301,8 +315,13 @@ with st.sidebar:
                     if _s.chat.export_location
                     else ":material/add_circle:",
                     use_container_width=True,
-                    disabled=len(_s.chat.messages) < 2,
                 )
+            st.button(
+                "Copy to clipboard",
+                on_click=_handle_copy_to_clipboard,
+                icon=":material/content_copy:",
+                use_container_width=True,
+            )
     st.selectbox(
         "Choose your model",
         models,
