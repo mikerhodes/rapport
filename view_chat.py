@@ -1,5 +1,6 @@
 from io import StringIO
 from pathlib import Path
+import shutil
 import subprocess
 from typing import cast, Optional
 
@@ -214,6 +215,26 @@ def _handle_copy_to_clipboard():
     st.toast("Copied to clipboard")
 
 
+def _handle_create_gist():
+    """Use pbcopy to copy to clipboard"""
+    p = subprocess.Popen(
+        [
+            "gh",
+            "gist",
+            "create",
+            "-f",
+            f"{_s.chat.title}-{_s.chat.id}.md",
+            "-d",
+            generate_chat_title(_s.chat),
+            "-",
+        ],
+        stdin=subprocess.PIPE,
+        close_fds=True,
+    )
+    p.communicate(input=_chat_as_markdown().encode("utf-8"))
+    st.toast("Saved as gist")
+
+
 def _chat_as_markdown() -> str:
     chat = _s.chat
     lines = []
@@ -308,20 +329,35 @@ with st.sidebar:
                 icon=":material/download:",
                 on_click="ignore",
             )
-            if _s.config_store.load_config().obsidian_directory:
-                st.button(
-                    "Obsidian",
-                    on_click=_handle_obsidian_download,
-                    icon=":material/check:"
-                    if _s.chat.export_location
-                    else ":material/add_circle:",
-                    use_container_width=True,
-                )
             st.button(
                 "Copy to clipboard",
                 on_click=_handle_copy_to_clipboard,
                 icon=":material/content_copy:",
                 use_container_width=True,
+            )
+            obsidian_av = (
+                _s.config_store.load_config().obsidian_directory is not None
+            )
+            st.button(
+                "Obsidian"
+                if obsidian_av
+                else "Set Obsidian directory to save to Obsidian",
+                on_click=_handle_obsidian_download,
+                icon=":material/check:"
+                if _s.chat.export_location
+                else ":material/add_circle:",
+                use_container_width=True,
+                disabled=not obsidian_av,
+            )
+            gh_tool_available = shutil.which("gh") is not None
+            st.button(
+                "Upload as gist"
+                if gh_tool_available
+                else "Install gh tool to enable gist upload",
+                on_click=_handle_create_gist,
+                icon=":material/cloud_upload:",
+                use_container_width=True,
+                disabled=not gh_tool_available,
             )
     st.selectbox(
         "Choose your model",
