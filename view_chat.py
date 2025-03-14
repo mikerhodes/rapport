@@ -220,6 +220,7 @@ def _chat_as_markdown() -> str:
     lines.append("---")
     lines.append("model: " + chat.model)
     lines.append("created_at: " + chat.created_at.isoformat())
+    lines.append("updated_at: " + chat.updated_at.isoformat())
     lines.append("---\n")
     lines.append(f"# {generate_chat_title(chat)}\n")
     for m in chat.messages:

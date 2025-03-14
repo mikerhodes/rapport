@@ -50,6 +50,7 @@ class Chat:
     model: str
     messages: MessageList
     created_at: datetime
+    updated_at: datetime
     title: str = field(default="New Chat")
     id: str = field(
         default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -63,6 +64,7 @@ def new_chat(model: str) -> Chat:
         model=model,
         messages=[SYSTEM],
         created_at=datetime.now(),
+        updated_at=datetime.now(),
     )
 
 

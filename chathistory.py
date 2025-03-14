@@ -60,6 +60,7 @@ class ChatHistoryManager:
             "id": chat.id,
             "title": chat.title,
             "created_at": chat.created_at.isoformat(),
+            "updated_at": chat.updated_at.isoformat(),
             "model": chat.model,
             "export_location": str(chat.export_location),
             "messages": [
@@ -134,6 +135,9 @@ class ChatHistoryManager:
                     model=d["model"],
                     messages=messages,
                     created_at=datetime.fromisoformat(d["created_at"]),
+                    updated_at=datetime.fromisoformat(d["updated_at"])
+                    if d.get("updated_at")
+                    else datetime.fromisoformat(d["created_at"]),
                 )
                 if p := d.get("export_location", None):
                     c.export_location = Path(p)
