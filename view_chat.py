@@ -212,11 +212,14 @@ def _handle_copy_to_clipboard():
         ["pbcopy", "w"], stdin=subprocess.PIPE, close_fds=True
     )
     p.communicate(input=_chat_as_markdown().encode("utf-8"))
-    st.toast("Copied to clipboard")
+    if p.returncode == 0:
+        st.toast("Copied to clipboard")
+    else:
+        st.toast(f"pbcopy execute failed: exited with {p.returncode}")
 
 
 def _handle_create_gist():
-    """Use pbcopy to copy to clipboard"""
+    """Create a gist using the gh tool"""
     p = subprocess.Popen(
         [
             "gh",
@@ -232,7 +235,10 @@ def _handle_create_gist():
         close_fds=True,
     )
     p.communicate(input=_chat_as_markdown().encode("utf-8"))
-    st.toast("Saved as gist")
+    if p.returncode == 0:
+        st.toast("Saved as gist")
+    else:
+        st.toast(f"gh execute failed: exited with {p.returncode}")
 
 
 def _chat_as_markdown() -> str:
