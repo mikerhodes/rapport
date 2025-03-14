@@ -208,10 +208,10 @@ def _handle_obsidian_download():
 def _handle_copy_to_clipboard():
     """Use pbcopy to copy to clipboard"""
     # TODO support other OSs.
-    p = subprocess.Popen(
-        ["pbcopy", "w"], stdin=subprocess.PIPE, close_fds=True
+    p = subprocess.run(
+        ["pbcopy", "w"],
+        input=_chat_as_markdown().encode("utf-8"),
     )
-    p.communicate(input=_chat_as_markdown().encode("utf-8"))
     if p.returncode == 0:
         st.toast("Copied to clipboard")
     else:
@@ -220,7 +220,7 @@ def _handle_copy_to_clipboard():
 
 def _handle_create_gist():
     """Create a gist using the gh tool"""
-    p = subprocess.Popen(
+    p = subprocess.run(
         [
             "gh",
             "gist",
@@ -231,10 +231,8 @@ def _handle_create_gist():
             generate_chat_title(_s.chat),
             "-",
         ],
-        stdin=subprocess.PIPE,
-        close_fds=True,
+        input=_chat_as_markdown().encode("utf-8"),
     )
-    p.communicate(input=_chat_as_markdown().encode("utf-8"))
     if p.returncode == 0:
         st.toast("Saved as gist")
     else:
