@@ -1,4 +1,5 @@
 from io import StringIO
+import logging
 from pathlib import Path
 import shutil
 import subprocess
@@ -19,6 +20,8 @@ from chatmodel import (
     new_chat,
 )
 from chathistory import ChatHistoryManager
+
+logger = logging.getLogger(__name__)
 
 
 class State:
@@ -208,35 +211,43 @@ def _handle_obsidian_download():
 def _handle_copy_to_clipboard():
     """Use pbcopy to copy to clipboard"""
     # TODO support other OSs.
-    p = subprocess.run(
-        ["pbcopy", "w"],
-        input=_chat_as_markdown().encode("utf-8"),
-    )
-    if p.returncode == 0:
-        st.toast("Copied to clipboard")
-    else:
-        st.toast(f"pbcopy execute failed: exited with {p.returncode}")
+    try:
+        p = subprocess.run(
+            ["pbcopy", "w"],
+            input=_chat_as_markdown().encode("utf-8"),
+        )
+        if p.returncode == 0:
+            st.toast("Copied to clipboard")
+        else:
+            st.toast(f"pbcopy execute failed: exited with {p.returncode}")
+    except Exception as ex:
+        logger.error("Exception executing pbcopy tool: %s", ex)
+        st.toast("Error executing pbcopy tool; check logs.")
 
 
 def _handle_create_gist():
     """Create a gist using the gh tool"""
-    p = subprocess.run(
-        [
-            "gh",
-            "gist",
-            "create",
-            "-f",
-            f"{_s.chat.title}-{_s.chat.id}.md",
-            "-d",
-            generate_chat_title(_s.chat),
-            "-",
-        ],
-        input=_chat_as_markdown().encode("utf-8"),
-    )
-    if p.returncode == 0:
-        st.toast("Saved as gist")
-    else:
-        st.toast(f"gh execute failed: exited with {p.returncode}")
+    try:
+        p = subprocess.run(
+            [
+                "gh",
+                "gist",
+                "create",
+                "-f",
+                f"{_s.chat.title}-{_s.chat.id}.md",
+                "-d",
+                generate_chat_title(_s.chat),
+                "-",
+            ],
+            input=_chat_as_markdown().encode("utf-8"),
+        )
+        if p.returncode == 0:
+            st.toast("Saved as gist")
+        else:
+            st.toast(f"gh execute failed: exited with {p.returncode}")
+    except Exception as ex:
+        logger.error("Exception executing gh tool: %s", ex)
+        st.toast("Error executing gh tool; check logs.")
 
 
 def _chat_as_markdown() -> str:
