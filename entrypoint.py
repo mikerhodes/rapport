@@ -10,6 +10,10 @@ from appconfig import ConfigStore
 
 logging.basicConfig(level=logging.INFO)
 
+st.set_page_config(
+    page_title="Rapport", page_icon=":robot_face:", layout="wide"
+)
+
 
 base_dir = Path.home() / ".config" / "rapport"
 base_dir.mkdir(exist_ok=True)
@@ -33,10 +37,6 @@ pg = st.navigation(
         st.Page(PAGE_CONFIG, title="Settings", icon=":material/settings:"),
     ]
 )
-st.set_page_config(
-    page_title="Rapport", page_icon=":robot_face:", layout="wide"
-)
-
 # TODO: why, when I put any of these into @st.cache_resource,
 # does the first chat message of the first chat in a session
 # end up with stale components outside the sidebar?
