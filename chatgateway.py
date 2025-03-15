@@ -45,15 +45,12 @@ class MessageChunk:
 class ChatAdaptor(Protocol):
     """ChatAdaptor adapts an LLM interface to ChatGateway's expectations."""
 
-    def show(self, model: str) -> Optional[ModelInfo]: ...
-
     def list(self) -> List[str]: ...
 
     def chat(
         self,
         model: str,
         messages: List[Dict[str, str]],
-        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]: ...
 
 
@@ -107,20 +104,14 @@ class ChatGateway:
         self,
         model: str,
         messages: MessageList,
-        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
         response = c.chat(
             model=model,
             messages=_prepare_messages_for_model(messages),
-            num_ctx=num_ctx,
         )
         for chunk in response:
             yield chunk
-
-    def show(self, model: str) -> Optional[ModelInfo]:
-        c = self.model_to_client[model]
-        return c.show(model)
 
 
 def _prepare_messages_for_model(
@@ -174,7 +165,7 @@ class OllamaAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
-    def show(self, model: str) -> Optional[ModelInfo]:
+    def _show(self, model: str) -> Optional[ModelInfo]:
         m = self.c.show(model)
         if m and m.modelinfo and m.details:
             return ModelInfo(
@@ -187,8 +178,15 @@ class OllamaAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: List[Dict[str, str]],
-        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
+        m = self._show(model)
+        if m is None:
+            logger.error("Ollama chat got unknown model: %s", model)
+            return
+        # Truncate the context length to reduce memory usage
+        # TODO make this an option?
+        num_ctx = min(8192, m.context_length)
+
         response = self.c.chat(
             model=model,
             messages=messages,
@@ -234,14 +232,10 @@ class AnthropicAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
-    def show(self, model: str) -> Optional[ModelInfo]:
-        return ModelInfo(model, 200_000)
-
     def chat(
         self,
         model: str,
         messages: List[Dict[str, str]],
-        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         system_prompt = "\n\n".join(
             [m["content"] for m in messages if m["role"] == "system"]
@@ -329,16 +323,10 @@ class WatsonxAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
-    def show(self, model: str) -> Optional[ModelInfo]:
-        return ModelInfo(
-            name=model, context_length=8192
-        )  # hardcode context length for now
-
     def chat(
         self,
         model: str,
         messages: List[Dict[str, str]],
-        num_ctx: int,
     ) -> Generator[MessageChunk, None, None]:
         params = {
             "time_limit": 10000,

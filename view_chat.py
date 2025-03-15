@@ -28,7 +28,6 @@ class State:
     chat: Chat
     user_prompt: ChatInputValue
     chat_gateway: ChatGateway
-    model_context_length: int
     generate_assistant: bool
     model: str
     history_manager: ChatHistoryManager
@@ -58,7 +57,6 @@ def stream_model_response():
     response = _s.chat_gateway.chat(
         model=_s.chat.model,
         messages=_s.chat.messages,
-        num_ctx=min(8192, st.session_state["model_context_length"]),
     )
     for chunk in (
         response
@@ -137,19 +135,10 @@ def _insert_file_chat_message(data, fname, fext: str):
 def handle_change_model():
     model = _s.model
     _s.chat.model = model
-    _update_context_length(model)
 
     c = _s.config_store.load_config()
     c.last_used_model = model
     _s.config_store.save_config(c)
-
-
-def _update_context_length(model):
-    m = _s.chat_gateway.show(model)
-    if m is not None:
-        _s.model_context_length = m.context_length
-    else:
-        _s.model_context_length = 0
 
 
 #
@@ -296,7 +285,6 @@ if "model" not in st.session_state:
         _s.model = last_used_model
     else:
         _s.model = models[0]
-_update_context_length(_s.model)
 
 # Really need to figure something better for state defaults
 if "load_chat_with_id" not in st.session_state:
