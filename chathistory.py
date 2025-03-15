@@ -63,6 +63,8 @@ class ChatHistoryManager:
             "updated_at": chat.updated_at.isoformat(),
             "model": chat.model,
             "export_location": str(chat.export_location),
+            "input_tokens": chat.input_tokens,
+            "output_tokens": chat.output_tokens,
             "messages": [
                 dict(type=type(m).__name__, **asdict(m))
                 for m in chat.messages
@@ -138,6 +140,8 @@ class ChatHistoryManager:
                     updated_at=datetime.fromisoformat(d["updated_at"])
                     if d.get("updated_at")
                     else datetime.fromisoformat(d["created_at"]),
+                    input_tokens=d.get("input_tokens", 0),
+                    output_tokens=d.get("output_tokens", 0),
                 )
                 if p := d.get("export_location", None):
                     c.export_location = Path(p)

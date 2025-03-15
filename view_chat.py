@@ -29,7 +29,6 @@ class State:
     user_prompt: ChatInputValue
     chat_gateway: ChatGateway
     model_context_length: int
-    used_tokens: int
     generate_assistant: bool
     model: str
     history_manager: ChatHistoryManager
@@ -64,8 +63,10 @@ def stream_model_response():
     for chunk in (
         response
     ):  # prompt eval count is the token count used from the model
-        if chunk.used_tokens is not None:
-            _s.used_tokens = chunk.used_tokens
+        if chunk.input_tokens is not None:
+            _s.chat.input_tokens = chunk.input_tokens
+        if chunk.output_tokens is not None:
+            _s.chat.output_tokens = chunk.output_tokens
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
         yield chunk.content
@@ -286,10 +287,6 @@ File `{m.name}` included in conversation:
 if "generate_assistant" not in st.session_state:
     _s.generate_assistant = False
 
-# Store the tokens used in the prompt
-if "used_tokens" not in st.session_state:
-    _s.used_tokens = 0
-
 # Retrieve the current models from ollama
 # Set a preferred model as default if there's none set
 last_used_model = _s.config_store.load_config().last_used_model
@@ -312,7 +309,6 @@ if chat_id := _s.load_chat_with_id:
 # "New Chat" is implemented as `del st.session_state["chat"]`
 if "chat" not in st.session_state:
     _s.chat = new_chat(_s.model)
-    _s.used_tokens = 0
 
 
 #
@@ -469,7 +465,12 @@ with chat_col:
         left, right = st.columns([3, 1])
         with left:
             used_tokens_holder = st.empty()
-            used_tokens_holder.caption(f"Used tokens: {_s.used_tokens}")
+            used_tokens_holder.caption(
+                "Used tokens: input {} / output: {}".format(
+                    _s.chat.input_tokens,
+                    _s.chat.output_tokens,
+                )
+            )
         with right:
             st.button(
                 "Regenerate",

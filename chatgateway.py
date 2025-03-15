@@ -36,7 +36,8 @@ class ModelInfo:
 
 @dataclass
 class MessageChunk:
-    used_tokens: Optional[int]
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
     content: str
     finish_reason: Optional[FinishReason]
 
@@ -198,14 +199,17 @@ class OllamaAdaptor(ChatAdaptor):
         )
         for chunk in response:
             finish_reason = None
-            used_tokens = None
+            input_tokens = None
+            output_tokens = None
             if chunk.get("done", False):
                 finish_reason = FinishReason.Stop
             if chunk.prompt_eval_count and chunk.eval_count:
-                used_tokens = chunk.prompt_eval_count + chunk.eval_count
+                input_tokens = chunk.prompt_eval_count
+                output_tokens = chunk.eval_count
             yield MessageChunk(
                 content=chunk["message"]["content"],
-                used_tokens=used_tokens,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 finish_reason=finish_reason,
             )
 
@@ -259,7 +263,7 @@ class AnthropicAdaptor(ChatAdaptor):
             # logger.info(event.type)
             content = ""
             finish_reason = None
-            used_tokens = None
+            output_tokens = None
 
             match event.type:
                 case "message_start":
@@ -269,7 +273,7 @@ class AnthropicAdaptor(ChatAdaptor):
                 ):
                     content = event.delta.text
                 case "message_delta":
-                    used_tokens = input_tokens + event.usage.output_tokens
+                    output_tokens = event.usage.output_tokens
                     match event.delta.stop_reason:
                         case "max_tokens":
                             finish_reason = FinishReason.Length
@@ -278,7 +282,8 @@ class AnthropicAdaptor(ChatAdaptor):
 
             yield MessageChunk(
                 content=content,
-                used_tokens=used_tokens,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 finish_reason=finish_reason,
             )
 
@@ -354,7 +359,8 @@ class WatsonxAdaptor(ChatAdaptor):
             stream_response = fmodel.chat_stream(messages=messages)
             for chunk in stream_response:
                 content = ""
-                used_tokens = None
+                input_tokens = None
+                output_tokens = None
                 finish_reason = None
                 if ch := chunk.get("choices"):
                     content = ch[0]["delta"].get("content", "")
@@ -368,10 +374,12 @@ class WatsonxAdaptor(ChatAdaptor):
                         case _:
                             finish_reason = FinishReason.Other
                 if chunk.get("usage"):
-                    used_tokens = chunk["usage"]["total_tokens"]
+                    input_tokens = chunk["usage"]["total_tokens"]
+                    output_tokens = 0  # TODO fix this per watsonx schema
                 mc = MessageChunk(
                     content=content,
-                    used_tokens=used_tokens,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
                     finish_reason=finish_reason,
                 )
                 yield mc
