@@ -103,25 +103,20 @@ class ChatHistoryManager:
         self, dm: Dict
     ) -> Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile]:
         """Parse a message dict loaded from JSON into a concrete type."""
-        message_types = {
-            "SystemMessage": SystemMessage,
-            "UserMessage": UserMessage,
-            "AssistantMessage": AssistantMessage,
-            "IncludedFile": IncludedFile,
-        }
-
-        message_class = message_types.get(dm["type"])
-        if not message_class:
-            raise ValueError(f"Unknown message type: {dm['type']}")
-
-        if message_class in (SystemMessage, UserMessage, AssistantMessage):
-            return message_class(message=dm["message"])
-        elif message_class == IncludedFile:
-            return message_class(
-                name=dm["name"], ext=dm["ext"], data=dm["data"]
-            )
-        else:  # maybe there's some way to make the type checker happier
-            raise ValueError(f"Unknown message type: {dm['type']}")
+        message_class = dm.get("type")
+        match message_class:
+            case "SystemMessage":
+                return SystemMessage(message=dm["message"])
+            case "UserMessage":
+                return UserMessage(message=dm["message"])
+            case "AssistantMessage":
+                return AssistantMessage(message=dm["message"])
+            case "IncludedFile":
+                return IncludedFile(
+                    name=dm["name"], ext=dm["ext"], data=dm["data"]
+                )
+            case _:
+                raise ValueError(f"Unknown message type: {dm['type']}")
 
     def get_chat(self, chat_id: str) -> Optional[Chat]:
         """Retrieve a specific chat from its JSON file"""
