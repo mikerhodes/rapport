@@ -4,60 +4,57 @@ General constants and types.
 Trying to keep this indepdent from streamlit.
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Literal
+from pydantic import BaseModel, Field, field_serializer
 
 PAGE_CHAT = "view_chat.py"
 PAGE_HISTORY = "view_history.py"
 PAGE_CONFIG = "view_config.py"
 
 
-@dataclass
-class AssistantMessage:
+class BaseMessage(BaseModel):
     message: str
-    role: str = field(default="assistant")
+    role: str
 
 
-@dataclass
-class UserMessage:
-    message: str
-    role: str = field(default="user")
+class SystemMessage(BaseMessage):
+    role: Literal["system"] = "system"
 
 
-@dataclass
-class IncludedFile:
+class UserMessage(BaseMessage):
+    role: Literal["user"] = "user"
+
+
+class AssistantMessage(BaseMessage):
+    role: Literal["assistant"] = "assistant"
+
+
+class IncludedFile(BaseMessage):
+    role: Literal["user"] = "user"
     name: str
     ext: str
     data: str
-    role: str = field(default="user")
 
 
-@dataclass
-class SystemMessage:
-    message: str
-    role: str = field(default="system")
+MessageList = List[Union[AssistantMessage, UserMessage, SystemMessage, IncludedFile]]
 
 
-type MessageList = List[
-    Union[AssistantMessage, UserMessage, SystemMessage, IncludedFile]
-]
-
-
-@dataclass
-class Chat:
+class Chat(BaseModel):
     model: str
     messages: MessageList
     created_at: datetime
     updated_at: datetime
-    title: str = field(default="New Chat")
-    id: str = field(
-        default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
-    )
-    export_location: Optional[Path] = field(default=None)
-    input_tokens: int = field(default=0)
-    output_tokens: int = field(default=0)
+    title: str = "New Chat"
+    id: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
+    export_location: Optional[Path] = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    
+    @field_serializer('export_location')
+    def serialize_path(self, path: Optional[Path]) -> Optional[str]:
+        return str(path) if path else None
 
 
 def new_chat(model: str) -> Chat:
