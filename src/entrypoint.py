@@ -40,6 +40,8 @@ pg = st.navigation(
 # TODO: why, when I put any of these into @st.cache_resource,
 # does the first chat message of the first chat in a session
 # end up with stale components outside the sidebar?
+# More specifically, I think that the first rerun ends up with
+# the stale components, as that rerun is the first after the cache_resource.
 # So for now these remain created per session to avoid ugliness.
 if "config_store" not in st.session_state:
     st.session_state["config_store"] = ConfigStore(base_dir / "config.json")
@@ -49,5 +51,14 @@ if "history_manager" not in st.session_state:
 if "chat_gateway" not in st.session_state:
     print("Init chat gateway")
     st.session_state["chat_gateway"] = ChatGateway()
+
+
+@st.cache_resource
+def foo():
+    return "bar"
+
+
+foo()
+
 
 pg.run()

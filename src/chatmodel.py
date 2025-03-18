@@ -70,6 +70,7 @@ def new_chat(model: str) -> Chat:
     )
 
 
-with open("systemprompt.md", "r") as file:
+prompt_path = Path(__file__).parent / "systemprompt.md"
+with open(prompt_path, "r") as file:
     system_prompt = file.read()
 SYSTEM = SystemMessage(system_prompt)
