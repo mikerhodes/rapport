@@ -1,6 +1,6 @@
 [project]
 name = "rapport"
-version = "0.1.0"
+version = "0.10.0"
 description = "An experiment in using Ollama and Streamlit to try out LLMs locally"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,7 +17,7 @@ dependencies = [
 package = true
 
 [project.scripts]
-rapport = "main:run_with_runpy"
+rapport = "rapport.main:run_with_runpy"
 
 [tool.pyright]
 venvPath = "."
