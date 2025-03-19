@@ -10,7 +10,6 @@ from chatmodel import (
     IncludedFile,
     SystemMessage,
     UserMessage,
-    BaseMessage,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,12 +58,7 @@ class ChatHistoryManager:
         chat_path = self.chats_dir / f"{chat.id}.json"
         with open(chat_path, "w") as f:
             # Use Pydantic's model_dump with mode='json' for serialization
-            chat_json = chat.model_dump(mode='json')
-            # Add type information to messages for proper deserialization
-            chat_json["messages"] = [
-                {"type": type(m).__name__, **m.model_dump(mode='json')}
-                for m in chat.messages
-            ]
+            chat_json = chat.model_dump(mode="json")
             json.dump(chat_json, f, indent=2)
         logger.info("Saved chat to %s", chat_path)
 
@@ -90,24 +84,6 @@ class ChatHistoryManager:
 
         return sorted_chats
 
-    def _parse_message(
-        self, dm: Dict[str, Any]
-    ) -> Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile]:
-        """Parse a message dict loaded from JSON into a concrete type."""
-        message_type = dm.pop("type", None)
-        
-        match message_type:
-            case "SystemMessage":
-                return SystemMessage(**dm)
-            case "UserMessage":
-                return UserMessage(**dm)
-            case "AssistantMessage":
-                return AssistantMessage(**dm)
-            case "IncludedFile":
-                return IncludedFile(**dm)
-            case _:
-                raise ValueError(f"Unknown message type: {message_type}")
-
     def get_chat(self, chat_id: str) -> Optional[Chat]:
         """Retrieve a specific chat from its JSON file"""
         chat_path = self.chats_dir / f"{chat_id}.json"
@@ -115,23 +91,9 @@ class ChatHistoryManager:
             logger.info("Loading chat from %s", chat_path)
             with open(chat_path, "r") as f:
                 d = json.load(f)
-                # Parse messages with type information
-                messages = [self._parse_message(dm) for dm in d.pop("messages", [])]
-                
-                # Convert string dates to datetime objects
-                if "created_at" in d:
-                    d["created_at"] = datetime.fromisoformat(d["created_at"])
-                if "updated_at" in d:
-                    d["updated_at"] = datetime.fromisoformat(d["updated_at"])
-                elif "created_at" in d:
+                if "updated_at" not in d:
                     d["updated_at"] = d["created_at"]
-                    
-                # Convert export_location string to Path if present
-                if d.get("export_location"):
-                    d["export_location"] = Path(d["export_location"])
-                    
-                # Create Chat object with parsed data
-                return Chat(messages=messages, **d)
+                return Chat(**d)
         except FileNotFoundError:
             return None
 

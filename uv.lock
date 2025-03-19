@@ -664,11 +664,12 @@ wheels = [
 [[package]]
 name = "rapport"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "ibm-watsonx-ai" },
     { name = "ollama" },
+    { name = "pydantic" },
     { name = "streamlit" },
     { name = "watchdog" },
 ]
@@ -678,6 +679,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.46.0" },
     { name = "ibm-watsonx-ai", specifier = ">=1.2.9" },
     { name = "ollama", specifier = ">=0.4.7" },
+    { name = "pydantic", specifier = ">=2.6.0" },
     { name = "streamlit", specifier = ">=1.42.0" },
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
