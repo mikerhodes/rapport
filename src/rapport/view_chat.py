@@ -385,6 +385,7 @@ with st.sidebar:
 
     st.page_link(PAGE_HISTORY, label="More chats ->")
 
+
 chat_col, col2 = st.columns([3, 1])
 
 with col2:
@@ -403,6 +404,7 @@ with col2:
 
         Include several files from path using pattern glob.
     """)
+
 
 with chat_col:
     # Display chat messages from history on app rerun

@@ -37,20 +37,32 @@ pg = st.navigation(
         st.Page(PAGE_CONFIG, title="Settings", icon=":material/settings:"),
     ]
 )
-# TODO: why, when I put any of these into @st.cache_resource,
-# does the first chat message of the first chat in a session
-# end up with stale components outside the sidebar?
-# More specifically, I think that the first rerun ends up with
-# the stale components, as that rerun is the first after the cache_resource.
-# So for now these remain created per session to avoid ugliness.
+
+
+# with show_spinner=True, often get ghosted components because streamlit
+# inserts a spinner element into the tree.
+@st.cache_resource(show_spinner=False)
+def gateway():
+    return ChatGateway()
+
+
+@st.cache_resource(show_spinner=False)
+def history_store():
+    return ChatHistoryManager(base_dir)
+
+
+@st.cache_resource(show_spinner=False)
+def config_store():
+    return ConfigStore(base_dir / "config.json")
+
+
 if "config_store" not in st.session_state:
-    st.session_state["config_store"] = ConfigStore(base_dir / "config.json")
+    st.session_state["config_store"] = config_store()
 if "history_manager" not in st.session_state:
-    ch = ChatHistoryManager(base_dir)
-    st.session_state["history_manager"] = ch
+    st.session_state["history_manager"] = history_store()
 if "chat_gateway" not in st.session_state:
     print("Init chat gateway")
-    st.session_state["chat_gateway"] = ChatGateway()
+    st.session_state["chat_gateway"] = gateway()
 
 
 pg.run()
