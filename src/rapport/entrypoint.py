@@ -53,12 +53,4 @@ if "chat_gateway" not in st.session_state:
     st.session_state["chat_gateway"] = ChatGateway()
 
 
-@st.cache_resource
-def foo():
-    return "bar"
-
-
-foo()
-
-
 pg.run()
