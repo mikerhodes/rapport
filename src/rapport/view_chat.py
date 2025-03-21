@@ -8,6 +8,7 @@ from typing import cast, Optional
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
 
+from rapport import consts
 from rapport.appconfig import ConfigStore
 from rapport.chatgateway import ChatGateway, FinishReason
 from rapport.chatmodel import (
@@ -485,4 +486,5 @@ st.chat_input(
     key="user_prompt",
     on_submit=handle_submit_prompt,
     accept_file="multiple",
+    file_type=consts.TEXT_FILE_EXTENSIONS,
 )
