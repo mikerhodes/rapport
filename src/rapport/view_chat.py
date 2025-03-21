@@ -87,6 +87,11 @@ def handle_submit_prompt():
         ext = f.name.split(".")[-1]
         _insert_file_chat_message(data, f.name, ext)
 
+    # if the user just uploaded some files to the chat,
+    # don't invoke the model.
+    if not prompt.text:
+        return
+
     if prompt.text.startswith("/include"):
         _handle_submit_include(prompt.text)
     else:
