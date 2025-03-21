@@ -1,7 +1,7 @@
 import streamlit as st
 from pathlib import Path
 
-from appconfig import Config, ConfigStore
+from rapport.appconfig import Config, ConfigStore
 
 st.title("Settings")
 

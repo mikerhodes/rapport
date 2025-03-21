@@ -11,7 +11,7 @@ from anthropic import Anthropic
 from anthropic.types import MessageParam
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 
-from chatmodel import (
+from rapport.chatmodel import (
     AssistantMessage,
     IncludedFile,
     MessageList,

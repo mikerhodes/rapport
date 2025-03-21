@@ -8,9 +8,9 @@ from typing import cast, Optional
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
 
-from appconfig import ConfigStore
-from chatgateway import ChatGateway, FinishReason
-from chatmodel import (
+from rapport.appconfig import ConfigStore
+from rapport.chatgateway import ChatGateway, FinishReason
+from rapport.chatmodel import (
     PAGE_HISTORY,
     AssistantMessage,
     Chat,
@@ -19,7 +19,7 @@ from chatmodel import (
     UserMessage,
     new_chat,
 )
-from chathistory import ChatHistoryManager
+from rapport.chathistory import ChatHistoryManager
 
 logger = logging.getLogger(__name__)
 

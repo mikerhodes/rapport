@@ -4,12 +4,8 @@ from typing import List, Dict, Optional, Union, cast, Any
 from datetime import datetime, timedelta
 import logging
 
-from chatmodel import (
-    AssistantMessage,
+from rapport.chatmodel import (
     Chat,
-    IncludedFile,
-    SystemMessage,
-    UserMessage,
 )
 
 logger = logging.getLogger(__name__)

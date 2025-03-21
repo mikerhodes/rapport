@@ -3,10 +3,10 @@ from pathlib import Path
 
 import streamlit as st
 
-from chathistory import ChatHistoryManager
-from chatgateway import ChatGateway
-from chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HISTORY
-from appconfig import ConfigStore
+from rapport.chathistory import ChatHistoryManager
+from rapport.chatgateway import ChatGateway
+from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HISTORY
+from rapport.appconfig import ConfigStore
 
 logging.basicConfig(level=logging.INFO)
 

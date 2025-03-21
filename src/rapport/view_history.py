@@ -2,7 +2,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from chatmodel import PAGE_CHAT, Chat
+from rapport.chatmodel import PAGE_CHAT
 
 #
 # Helpers and handlers
