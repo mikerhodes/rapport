@@ -1,5 +1,6 @@
 from io import StringIO
 import logging
+import traceback
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ from rapport.chatmodel import (
     AssistantMessage,
     Chat,
     IncludedFile,
+    IncludedImage,
     SystemMessage,
     UserMessage,
     new_chat,
@@ -146,6 +148,7 @@ def _handle_submit_include(prompt: str):
 
 def _insert_file_chat_message(data, fname, fext: str):
     _s.chat.messages.append(IncludedFile(name=fname, ext=fext, data=data))
+
 
 def _insert_image_chat_message(path, fname):
     _s.chat.messages.append(IncludedImage(name=fname, path=path))
@@ -476,6 +479,8 @@ with chat_col:
                 save_current_chat()
                 # st.rerun()
             except Exception as e:
+                print(e)
+                print(traceback.format_exc())
                 print("The server could not be reached")
                 st.error(e)
 
@@ -514,5 +519,10 @@ st.chat_input(
     key="user_prompt",
     on_submit=handle_submit_prompt,
     accept_file="multiple",
-    file_type=consts.TEXT_FILE_EXTENSIONS + (consts.IMAGE_FILE_EXTENSIONS if _s.chat_gateway.supports_images(_s.model) else []),
+    file_type=consts.TEXT_FILE_EXTENSIONS
+    + (
+        consts.IMAGE_FILE_EXTENSIONS
+        if _s.chat_gateway.supports_images(_s.model)
+        else []
+    ),
 )

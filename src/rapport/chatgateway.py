@@ -2,18 +2,25 @@ import os
 from dataclasses import dataclass
 from enum import Enum, auto
 import logging
+from pathlib import Path
 from typing import Dict, Generator, List, Optional, Protocol
 
+from anthropic.types.image_block_param import Source
 import ibm_watsonx_ai as wai
 import ibm_watsonx_ai.foundation_models as waifm
 import ollama
 from anthropic import Anthropic
-from anthropic.types import MessageParam
+from anthropic.types import (
+    Base64ImageSourceParam,
+    ImageBlockParam,
+    MessageParam,
+)
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 
 from rapport.chatmodel import (
     AssistantMessage,
     IncludedFile,
+    IncludedImage,
     MessageList,
     SystemMessage,
     UserMessage,
@@ -74,8 +81,8 @@ class ChatGateway:
         # For now, only Anthropic models support images
         return model in [
             "claude-3-7-sonnet-latest",
-            "claude-3-5-sonnet-latest", 
-            "claude-3-5-haiku-latest"
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
         ]
 
     def __init__(self):
@@ -116,7 +123,9 @@ class ChatGateway:
         messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
-        messages_content, image_messages = _prepare_messages_for_model(messages)
+        messages_content, image_messages = _prepare_messages_for_model(
+            messages
+        )
         response = c.chat(
             model=model,
             messages=messages_content,
@@ -230,13 +239,15 @@ class AnthropicAdaptor(ChatAdaptor):
     models: List[str]
     c: Anthropic
 
-    def _prepare_image_content(self, image_path: Path) -> Dict:
+    def _prepare_image_content_source(
+        self, image_path: Path
+    ) -> ImageBlockParam:
         """Convert image to base64 for Anthropic API"""
         import base64
-        
+
         with open(image_path, "rb") as img_file:
             base64_image = base64.b64encode(img_file.read()).decode("utf-8")
-        
+
         mime_type = "image/jpeg"  # Default
         if image_path.suffix.lower() in [".png"]:
             mime_type = "image/png"
@@ -244,14 +255,36 @@ class AnthropicAdaptor(ChatAdaptor):
             mime_type = "image/gif"
         elif image_path.suffix.lower() in [".webp"]:
             mime_type = "image/webp"
-        
+
+        return ImageBlockParam(
+            type="image",
+            source=Base64ImageSourceParam(
+                type="base64", media_type=mime_type, data=base64_image
+            ),
+        )
+
+    def _prepare_image_content(self, image_path: Path) -> Dict:
+        """Convert image to base64 for Anthropic API"""
+        import base64
+
+        with open(image_path, "rb") as img_file:
+            base64_image = base64.b64encode(img_file.read()).decode("utf-8")
+
+        mime_type = "image/jpeg"  # Default
+        if image_path.suffix.lower() in [".png"]:
+            mime_type = "image/png"
+        elif image_path.suffix.lower() in [".gif"]:
+            mime_type = "image/gif"
+        elif image_path.suffix.lower() in [".webp"]:
+            mime_type = "image/webp"
+
         return {
             "type": "image",
             "source": {
                 "type": "base64",
                 "media_type": mime_type,
-                "data": base64_image
-            }
+                "data": base64_image,
+            },
         }
 
     def __init__(self):
@@ -279,27 +312,26 @@ class AnthropicAdaptor(ChatAdaptor):
         system_prompt = "\n\n".join(
             [m["content"] for m in messages if m["role"] == "system"]
         )
-        
-        # Process regular messages
+
         anth_messages = []
+
+        # add images first
+        for img in images:
+            anth_messages.append(
+                MessageParam(
+                    role="user",
+                    content=[self._prepare_image_content_source(img.path)],
+                )
+            )
+
+        # Process regular messages
         for m in messages:
-            if m["role"] in ["user", "assistant"]:
-                anth_messages.append(MessageParam(role=m["role"], content=m["content"]))  # type: ignore
-        
-        # Add images to the last user message if there are any
-        if images and anth_messages:
-            # Find the last user message
-            for i in range(len(anth_messages) - 1, -1, -1):
-                if anth_messages[i].role == "user":  # type: ignore
-                    # Convert the content to a list if it's not already
-                    if isinstance(anth_messages[i].content, str):  # type: ignore
-                        anth_messages[i].content = [{"type": "text", "text": anth_messages[i].content}]  # type: ignore
-                    
-                    # Add each image
-                    for img in images:
-                        anth_messages[i].content.append(self._prepare_image_content(img.path))  # type: ignore
-                    break
-        
+            r = m["role"]
+            if r in ["user", "assistant"]:
+                anth_messages.append(
+                    MessageParam(role=r, content=m["content"])
+                )  # type: ignore
+
         chunk_stream = self.c.messages.create(
             max_tokens=2048,
             messages=anth_messages,
