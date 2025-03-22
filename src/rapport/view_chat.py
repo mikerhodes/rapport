@@ -87,13 +87,7 @@ def handle_submit_prompt():
     for f in prompt.files:
         file_ext = Path(f.name).suffix.lower()
         if file_ext in consts.IMAGE_FILE_EXTENSIONS:
-            # Save image to a temporary location
-            temp_dir = Path.home() / ".config" / "rapport" / "temp_images"
-            temp_dir.mkdir(exist_ok=True, parents=True)
-            temp_path = temp_dir / f.name
-            with open(temp_path, "wb") as img_file:
-                img_file.write(f.getvalue())
-            _insert_image_chat_message(temp_path, f.name)
+            _insert_image_chat_message(f.getvalue(), f.name)
         else:
             data = StringIO(f.getvalue().decode("utf-8")).read()
             ext = f.name.split(".")[-1]
@@ -150,7 +144,13 @@ def _insert_file_chat_message(data, fname, fext: str):
     _s.chat.messages.append(IncludedFile(name=fname, ext=fext, data=data))
 
 
-def _insert_image_chat_message(path, fname):
+def _insert_image_chat_message(data: bytes, fname: str):
+    # Save image to chat store
+    dir = Path.home() / ".config" / "rapport" / "temp_images"
+    dir.mkdir(exist_ok=True, parents=True)
+    fpath = dir / f"{_s.chat.id}-{fname}"
+    with open(fpath, "wb") as img_file:
+        img_file.write(data)
     _s.chat.messages.append(IncludedImage(name=fname, path=path))
 
 
