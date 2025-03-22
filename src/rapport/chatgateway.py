@@ -263,30 +263,6 @@ class AnthropicAdaptor(ChatAdaptor):
             ),
         )
 
-    def _prepare_image_content(self, image_path: Path) -> Dict:
-        """Convert image to base64 for Anthropic API"""
-        import base64
-
-        with open(image_path, "rb") as img_file:
-            base64_image = base64.b64encode(img_file.read()).decode("utf-8")
-
-        mime_type = "image/jpeg"  # Default
-        if image_path.suffix.lower() in [".png"]:
-            mime_type = "image/png"
-        elif image_path.suffix.lower() in [".gif"]:
-            mime_type = "image/gif"
-        elif image_path.suffix.lower() in [".webp"]:
-            mime_type = "image/webp"
-
-        return {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": mime_type,
-                "data": base64_image,
-            },
-        }
-
     def __init__(self):
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise MissingEnvVarException("ANTHROPIC_API_KEY")
