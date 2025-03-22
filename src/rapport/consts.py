@@ -1,3 +1,15 @@
+IMAGE_FILE_EXTENSIONS = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".tiff",
+    ".tif",
+    ".svg",
+]
+
 TEXT_FILE_EXTENSIONS = [
     # Plain text
     ".txt",
