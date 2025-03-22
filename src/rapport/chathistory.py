@@ -98,6 +98,22 @@ class ChatHistoryManager:
         chat_path = self.chats_dir / f"{chat_id}.json"
 
         try:
+            # First, load the chat to find any associated images
+            chat = self.get_chat(chat_id)
+            if chat:
+                # Find and delete any associated image files
+                temp_images_dir = Path.home() / ".config" / "rapport" / "temp_images"
+                if temp_images_dir.exists():
+                    for message in chat.messages:
+                        if hasattr(message, 'type') and message.type == "IncludedImage" and hasattr(message, 'path'):
+                            try:
+                                image_path = Path(message.path)
+                                if image_path.exists() and temp_images_dir in image_path.parents:
+                                    image_path.unlink()
+                                    logger.info(f"Deleted associated image: {image_path}")
+                            except Exception as e:
+                                logger.error(f"Error deleting image file: {e}")
+
             # Delete the chat file
             chat_path.unlink()
 
@@ -133,8 +149,25 @@ class ChatHistoryManager:
 
         # Delete the files and update the index
         deleted_count = 0
+        temp_images_dir = Path.home() / ".config" / "rapport" / "temp_images"
+        
         for chat_id in chat_ids_to_delete:
             try:
+                # First load the chat to find associated images
+                chat = self.get_chat(chat_id)
+                if chat and temp_images_dir.exists():
+                    # Find and delete any associated image files
+                    for message in chat.messages:
+                        if hasattr(message, 'type') and message.type == "IncludedImage" and hasattr(message, 'path'):
+                            try:
+                                image_path = Path(message.path)
+                                if image_path.exists() and temp_images_dir in image_path.parents:
+                                    image_path.unlink()
+                                    logger.info(f"Deleted associated image: {image_path}")
+                            except Exception as e:
+                                logger.error(f"Error deleting image file: {e}")
+                
+                # Delete the chat file
                 chat_path = self.chats_dir / f"{chat_id}.json"
                 chat_path.unlink()
             except FileNotFoundError:
