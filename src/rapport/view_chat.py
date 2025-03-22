@@ -1,4 +1,5 @@
 from io import StringIO
+import io
 import logging
 import traceback
 from pathlib import Path
@@ -6,6 +7,8 @@ import shutil
 import subprocess
 from typing import cast, Optional
 
+from PIL import Image
+from PIL.Image import Resampling
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
 
@@ -145,13 +148,24 @@ def _insert_file_chat_message(data, fname, fext: str):
 
 
 def _insert_image_chat_message(data: bytes, fname: str):
+    # Claude recommends image sizes of 1,500px or less on the longest
+    # side. So let's resize the image to be smaller than that.
+    im = Image.open(io.BytesIO(data))
+    fmt = im.format
+    orig_width, orig_height = im.size
+    im.thumbnail((1200, 1200), Resampling.LANCZOS)
+    width, height = im.size
+    print(f"Resized image: {orig_width}x{orig_height} -> {width}x{height}")
+    data_resized = io.BytesIO()
+    im.save(data_resized, format=fmt)
+
     # Save image to chat store
     dir = Path.home() / ".config" / "rapport" / "temp_images"
     dir.mkdir(exist_ok=True, parents=True)
     fpath = dir / f"{_s.chat.id}-{fname}"
     with open(fpath, "wb") as img_file:
-        img_file.write(data)
-    _s.chat.messages.append(IncludedImage(name=fname, path=path))
+        img_file.write(data_resized.getvalue())
+    _s.chat.messages.append(IncludedImage(name=fname, path=fpath))
 
 
 def handle_change_model():
@@ -449,7 +463,7 @@ with chat_col:
             case IncludedImage(name=name, path=path, role=role):
                 with st.chat_message(role, avatar=":material/image:"):
                     st.markdown(f"Included image `{name}` in chat.")
-                    st.image(str(path), caption=name)
+                    st.image(str(path))
             case AssistantMessage() | UserMessage():
                 with st.chat_message(message.role):
                     st.markdown(message.message)
