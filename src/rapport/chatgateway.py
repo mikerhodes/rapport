@@ -2,18 +2,27 @@ import os
 from dataclasses import dataclass
 from enum import Enum, auto
 import logging
-from typing import Dict, Generator, List, Optional, Protocol
+from pathlib import Path
+from typing import Dict, Generator, List, Optional, Protocol, Tuple
 
 import ibm_watsonx_ai as wai
 import ibm_watsonx_ai.foundation_models as waifm
 import ollama
 from anthropic import Anthropic
-from anthropic.types import MessageParam
+from anthropic.types import (
+    Base64ImageSourceParam,
+    DocumentBlockParam,
+    ImageBlockParam,
+    MessageParam,
+    PlainTextSourceParam,
+    TextBlockParam,
+)
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 
 from rapport.chatmodel import (
     AssistantMessage,
     IncludedFile,
+    IncludedImage,
     MessageList,
     SystemMessage,
     UserMessage,
@@ -50,14 +59,18 @@ class ChatAdaptor(Protocol):
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
-        images: List[IncludedImage] = [],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]: ...
 
 
 class MissingEnvVarException(Exception):
     def __str__(self) -> str:
         return f"Missing env var: {self.args[0]}"
+
+
+class BadImageFormat(Exception):
+    def __str__(self) -> str:
+        return f"Unsupported image format: {self.args[0]}"
 
 
 class ChatException(Exception):
@@ -74,8 +87,8 @@ class ChatGateway:
         # For now, only Anthropic models support images
         return model in [
             "claude-3-7-sonnet-latest",
-            "claude-3-5-sonnet-latest", 
-            "claude-3-5-haiku-latest"
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
         ]
 
     def __init__(self):
@@ -116,11 +129,9 @@ class ChatGateway:
         messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
-        messages_content, image_messages = _prepare_messages_for_model(messages)
         response = c.chat(
             model=model,
-            messages=messages_content,
-            images=image_messages if self.supports_images(model) else [],
+            messages=messages,
         )
         for chunk in response:
             yield chunk
@@ -190,9 +201,9 @@ class OllamaAdaptor(ChatAdaptor):
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
-        images: List[IncludedImage] = [],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
+        messages_content, _ = _prepare_messages_for_model(messages)
         m = self._show(model)
         if m is None:
             logger.error("Ollama chat got unknown model: %s", model)
@@ -203,7 +214,7 @@ class OllamaAdaptor(ChatAdaptor):
 
         response = self.c.chat(
             model=model,
-            messages=messages,
+            messages=messages_content,
             stream=True,
             options=ollama.Options(
                 num_ctx=num_ctx,
@@ -230,29 +241,93 @@ class AnthropicAdaptor(ChatAdaptor):
     models: List[str]
     c: Anthropic
 
-    def _prepare_image_content(self, image_path: Path) -> Dict:
+    def _prepare_messages_for_model(
+        self,
+        messages: MessageList,
+    ) -> Tuple[List[TextBlockParam], List[MessageParam]]:
+        """
+        Return (system_prompt, message_list) in Anthropic client
+        format.
+        The Anthropic SDK expects the system prompt in a separate
+        argument, so return it separately.
+        In addition, return messages in the order they appear in
+        the chat.
+        """
+
+        sys_str = "\n\n".join(
+            [m.message for m in messages if isinstance(m, SystemMessage)]
+        )
+        system_prompt = [TextBlockParam(text=sys_str, type="text")]
+
+        output = []
+
+        for m in messages:
+            mp = None
+            match m:
+                case UserMessage():
+                    mp = MessageParam(
+                        role="user",
+                        content=m.message,
+                    )
+                case AssistantMessage():
+                    mp = MessageParam(
+                        role="assistant",
+                        content=m.message,
+                    )
+                case IncludedFile():
+                    p = self.prepare_documentblockparam(m.data)
+                    mp = MessageParam(
+                        role="user",
+                        content=[p],
+                    )
+                case IncludedImage():
+                    p = self.prepare_imageblockparam(m.path)
+                    mp = MessageParam(
+                        role="user",
+                        content=[p],
+                    )
+                case _:
+                    pass
+            if mp:
+                output.append(mp)
+
+        return (system_prompt, output)
+
+    def prepare_documentblockparam(self, text: str) -> DocumentBlockParam:
+        return DocumentBlockParam(
+            type="document",
+            source=PlainTextSourceParam(
+                type="text",
+                media_type="text/plain",
+                data=text,
+            ),
+        )
+
+    def prepare_imageblockparam(self, image_path: Path) -> ImageBlockParam:
         """Convert image to base64 for Anthropic API"""
         import base64
-        
+
         with open(image_path, "rb") as img_file:
             base64_image = base64.b64encode(img_file.read()).decode("utf-8")
-        
-        mime_type = "image/jpeg"  # Default
-        if image_path.suffix.lower() in [".png"]:
-            mime_type = "image/png"
-        elif image_path.suffix.lower() in [".gif"]:
-            mime_type = "image/gif"
-        elif image_path.suffix.lower() in [".webp"]:
-            mime_type = "image/webp"
-        
-        return {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": mime_type,
-                "data": base64_image
-            }
-        }
+
+        match image_path.suffix.lower():
+            case ".png":
+                mime_type = "image/png"
+            case ".gif":
+                mime_type = "image/gif"
+            case ".webp":
+                mime_type = "image/webp"
+            case ".jpg" | ".jpeg":
+                mime_type = "image/jpeg"
+            case other:
+                raise BadImageFormat(other)
+
+        return ImageBlockParam(
+            type="image",
+            source=Base64ImageSourceParam(
+                type="base64", media_type=mime_type, data=base64_image
+            ),
+        )
 
     def __init__(self):
         if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -273,33 +348,12 @@ class AnthropicAdaptor(ChatAdaptor):
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
-        images: List[IncludedImage] = [],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
-        system_prompt = "\n\n".join(
-            [m["content"] for m in messages if m["role"] == "system"]
+        system_prompt, anth_messages = self._prepare_messages_for_model(
+            messages
         )
-        
-        # Process regular messages
-        anth_messages = []
-        for m in messages:
-            if m["role"] in ["user", "assistant"]:
-                anth_messages.append(MessageParam(role=m["role"], content=m["content"]))  # type: ignore
-        
-        # Add images to the last user message if there are any
-        if images and anth_messages:
-            # Find the last user message
-            for i in range(len(anth_messages) - 1, -1, -1):
-                if anth_messages[i].role == "user":  # type: ignore
-                    # Convert the content to a list if it's not already
-                    if isinstance(anth_messages[i].content, str):  # type: ignore
-                        anth_messages[i].content = [{"type": "text", "text": anth_messages[i].content}]  # type: ignore
-                    
-                    # Add each image
-                    for img in images:
-                        anth_messages[i].content.append(self._prepare_image_content(img.path))  # type: ignore
-                    break
-        
+
         chunk_stream = self.c.messages.create(
             max_tokens=2048,
             messages=anth_messages,
@@ -381,9 +435,9 @@ class WatsonxAdaptor(ChatAdaptor):
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
-        images: List[IncludedImage] = [],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
+        messages_content, _ = _prepare_messages_for_model(messages)
         params = {
             "time_limit": 10000,
             "max_tokens": 4096,
@@ -400,7 +454,7 @@ class WatsonxAdaptor(ChatAdaptor):
         )
 
         try:
-            stream_response = fmodel.chat_stream(messages=messages)
+            stream_response = fmodel.chat_stream(messages=messages_content)
             for chunk in stream_response:
                 content = ""
                 input_tokens = None
