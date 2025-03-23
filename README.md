@@ -7,21 +7,21 @@ I built this because I'm excited by the idea that one can now (Jan 2025) run pre
 - Support Ollama, Anthropic and IBM watsonx.
 - Chat history saved for 90 days to JSON.
 - File uploads.
+  - Text files are supported for all models by inserting the content into the chat.
+  - Image files are supported for Anthropic. There's an issue for [images in Ollama models][olim].
 - Regenerate assistant chat messages (the models might be good, but they still emit duds!).
-- Select between installed Ollama models.
+- Select between installed Ollama models, or use the Anthropic or watsonx services (bring your own API keys).
 - Customise the system prompt by editing `systemprompt.md`.
 - Export the chat as markdown:
   - Download via browser.
   - Set up folder for export (eg in Obsidian vault). Once a chat is marked for export, the exported file is updated as the chat continues.
-  - Copy chat to clipboard.
+  - Copy chat to clipboard (currently macOS only).
+  - Upload to gist, when the `gh` tool is installed and authenticated.
+- Generally tries to limit libraries imported.
+
+[olim]: https://github.com/mikerhodes/rapport/issues/21
 
 ![](./images/chat-screenshot.png)
-
-Libraries:
-
-- [ollama/ollama-python: Ollama Python library](https://github.com/ollama/ollama-python)
-- [streamlit/streamlit: Streamlit — A faster way to build and share data apps.](https://github.com/streamlit/streamlit)
-- Also, Anthropic and watsonx client libraries.
 
 ## Getting started
 
@@ -62,7 +62,6 @@ The Ollama site has a list of [other available models](https://ollama.com/search
 
 I follow the guidance in the ollama Github README:
 
-> [!NOTE]
 > You should have at least 8 GB of RAM available to run the 7B models, 16 GB to run the 13B models, and 32 GB to run the 33B models.
 
 ### Run the python chatbot user interface
@@ -76,5 +75,5 @@ brew install uv
 As `uv run` installs dependencies, run the app using:
 
 ```
-uv run streamlit run entrypoint.py
+uv run rapport
 ```
