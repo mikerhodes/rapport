@@ -1,8 +1,12 @@
+import io
 import json
-from pathlib import Path
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from PIL import Image
+from PIL.Image import Resampling
 
 from rapport.chatmodel import (
     Chat,
@@ -15,7 +19,10 @@ class ChatHistoryManager:
     def __init__(self, base_dir: Path):
         # Ensure the .assistant directory exists
         self.chats_dir = base_dir / "chats"
-        self.chats_dir.mkdir(exist_ok=True)
+        self.chats_dir.mkdir(exist_ok=True, parents=True)
+
+        self.images_dir = base_dir / "images"
+        self.images_dir.mkdir(exist_ok=True, parents=True)
 
         # Create an index file to track chat metadata
         self.index_path = base_dir / "chat_index.json"
@@ -99,10 +106,7 @@ class ChatHistoryManager:
 
         try:
             # Find and delete any associated image files
-            temp_images_dir = (
-                Path.home() / ".config" / "rapport" / "temp_images"
-            )
-            chat_images = temp_images_dir.glob(chat_id + "*")
+            chat_images = self.images_dir.glob(chat_id + "*")
             for f in chat_images:
                 f.unlink()
 
@@ -141,11 +145,10 @@ class ChatHistoryManager:
 
         # Delete the files and update the index
         deleted_count = 0
-        temp_images_dir = Path.home() / ".config" / "rapport" / "temp_images"
 
         for chat_id in chat_ids_to_delete:
             try:
-                chat_images = temp_images_dir.glob(chat_id + "*")
+                chat_images = self.images_dir.glob(chat_id + "*")
                 for f in chat_images:
                     f.unlink()
                 chat_path = self.chats_dir / f"{chat_id}.json"
@@ -161,3 +164,29 @@ class ChatHistoryManager:
         print(f"Cleared {deleted_count} old chats from before {cutoff_date}")
 
         return deleted_count
+
+    def import_image(
+        self, chat_id: str, img_fname: str, data: bytes
+    ) -> Path:
+        """
+        Import an image into the chat store and return the path.
+        The path should be used for any IncludedImage objects in
+        the chat.
+        """
+        # Claude recommends image sizes of 1,500px or less on the longest
+        # side. So let's resize the image to be smaller than that.
+        im = Image.open(io.BytesIO(data))
+        fmt = im.format
+        orig_width, orig_height = im.size
+        im.thumbnail((1200, 1200), Resampling.LANCZOS)
+        width, height = im.size
+        print(
+            f"Resized image: {orig_width}x{orig_height} -> {width}x{height}"
+        )
+        data_resized = io.BytesIO()
+        im.save(data_resized, format=fmt)
+
+        fpath = self.images_dir / f"{chat_id}-{img_fname}"
+        with open(fpath, "wb") as img_file:
+            img_file.write(data_resized.getvalue())
+        return fpath
