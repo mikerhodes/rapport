@@ -532,7 +532,7 @@ except AttributeError:
     pass
 
 st.chat_input(
-    "Enter prompt here...",
+    "Your message",
     key="user_prompt",
     on_submit=handle_submit_prompt,
     accept_file="multiple",
