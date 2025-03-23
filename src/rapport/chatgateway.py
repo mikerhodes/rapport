@@ -56,6 +56,8 @@ class ChatAdaptor(Protocol):
 
     def list(self) -> List[str]: ...
 
+    def supports_images(self, model: str) -> bool: ...
+
     def chat(
         self,
         model: str,
@@ -81,15 +83,6 @@ class ChatException(Exception):
 class ChatGateway:
     models: List[str]
     model_to_client: Dict[str, ChatAdaptor]
-
-    def supports_images(self, model: str) -> bool:
-        """Check if the model supports image inputs"""
-        # For now, only Anthropic models support images
-        return model in [
-            "claude-3-7-sonnet-latest",
-            "claude-3-5-sonnet-latest",
-            "claude-3-5-haiku-latest",
-        ]
 
     def __init__(self):
         """Load up the available models"""
@@ -122,6 +115,11 @@ class ChatGateway:
 
     def list(self) -> List[str]:
         return self.models
+
+    def supports_images(self, model: str) -> bool:
+        """Check if the model supports image inputs"""
+        c = self.model_to_client[model]
+        return c.supports_images(model)
 
     def chat(
         self,
@@ -188,6 +186,9 @@ class OllamaAdaptor(ChatAdaptor):
 
     def list(self) -> List[str]:
         return self.models
+
+    def supports_images(self, model: str) -> bool:
+        return False
 
     def _show(self, model: str) -> Optional[ModelInfo]:
         m = self.c.show(model)
@@ -345,6 +346,10 @@ class AnthropicAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
+    def supports_images(self, model: str) -> bool:
+        # All the Anthropic models we provide support images
+        return True
+
     def chat(
         self,
         model: str,
@@ -431,6 +436,9 @@ class WatsonxAdaptor(ChatAdaptor):
 
     def list(self) -> List[str]:
         return self.models
+
+    def supports_images(self, model: str) -> bool:
+        return False
 
     def chat(
         self,
