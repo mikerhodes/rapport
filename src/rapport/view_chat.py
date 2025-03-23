@@ -445,7 +445,10 @@ with chat_col:
                 with st.chat_message(role, avatar=":material/image:"):
                     st.markdown(f"Included image `{name}` in chat.")
                     if _s.chat_gateway.supports_images(_s.model):
-                        st.image(str(path))
+                        # make the image a bit smaller
+                        a, _ = st.columns([1, 2])
+                        with a:
+                            st.image(str(path))
                     else:
                         st.warning("Change model to use images.")
             case AssistantMessage() | UserMessage():
