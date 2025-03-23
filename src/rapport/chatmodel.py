@@ -40,10 +40,17 @@ class IncludedFile(BaseModel):
     type: Literal["IncludedFile"] = "IncludedFile"
 
 
+class IncludedImage(BaseModel):
+    name: str
+    path: Path
+    role: Literal["user"] = "user"
+    type: Literal["IncludedImage"] = "IncludedImage"
+
+
 # This tells pydantic that the `type` field is used to figure
 # out which of the message types to parse the JSON into.
 Message = Annotated[
-    Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile],
+    Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile, IncludedImage],
     Field(discriminator="type"),
 ]
 

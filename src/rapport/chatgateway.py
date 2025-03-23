@@ -2,18 +2,27 @@ import os
 from dataclasses import dataclass
 from enum import Enum, auto
 import logging
-from typing import Dict, Generator, List, Optional, Protocol
+from pathlib import Path
+from typing import Dict, Generator, List, Optional, Protocol, Tuple
 
 import ibm_watsonx_ai as wai
 import ibm_watsonx_ai.foundation_models as waifm
 import ollama
 from anthropic import Anthropic
-from anthropic.types import MessageParam
+from anthropic.types import (
+    Base64ImageSourceParam,
+    DocumentBlockParam,
+    ImageBlockParam,
+    MessageParam,
+    PlainTextSourceParam,
+    TextBlockParam,
+)
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 
 from rapport.chatmodel import (
     AssistantMessage,
     IncludedFile,
+    IncludedImage,
     MessageList,
     SystemMessage,
     UserMessage,
@@ -47,16 +56,23 @@ class ChatAdaptor(Protocol):
 
     def list(self) -> List[str]: ...
 
+    def supports_images(self, model: str) -> bool: ...
+
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]: ...
 
 
 class MissingEnvVarException(Exception):
     def __str__(self) -> str:
         return f"Missing env var: {self.args[0]}"
+
+
+class BadImageFormat(Exception):
+    def __str__(self) -> str:
+        return f"Unsupported image format: {self.args[0]}"
 
 
 class ChatException(Exception):
@@ -100,6 +116,11 @@ class ChatGateway:
     def list(self) -> List[str]:
         return self.models
 
+    def supports_images(self, model: str) -> bool:
+        """Check if the model supports image inputs"""
+        c = self.model_to_client[model]
+        return c.supports_images(model)
+
     def chat(
         self,
         model: str,
@@ -108,7 +129,7 @@ class ChatGateway:
         c = self.model_to_client[model]
         response = c.chat(
             model=model,
-            messages=_prepare_messages_for_model(messages),
+            messages=messages,
         )
         for chunk in response:
             yield chunk
@@ -119,8 +140,11 @@ def _prepare_messages_for_model(
 ) -> List[Dict[str, str]]:
     """
     Converts message history format into format for model.
-    This implementation is generic. More advanced versions could
-    be implemented for multi-modal models like Claude.
+
+    This implementation only supports "basic" message types,
+    specifically ones that can be rendered to text. ChatAdaptors
+    that support more advanced models will need to add their
+    own implementations (see AnthropicAdaptor for an example).
     """
     # Models like things in this order:
     # - System
@@ -139,7 +163,8 @@ def _prepare_messages_for_model(
 
     result.extend([{"role": m.role, "content": m.message} for m in system])
     for m in file:
-        # Models don't have a file role, so convert
+        # This format seems to work well for models without
+        # a specific document type in their API.
         prompt = f"""
         `{m.name}`
         ---
@@ -165,6 +190,9 @@ class OllamaAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
+    def supports_images(self, model: str) -> bool:
+        return False
+
     def _show(self, model: str) -> Optional[ModelInfo]:
         m = self.c.show(model)
         if m and m.modelinfo and m.details:
@@ -177,8 +205,9 @@ class OllamaAdaptor(ChatAdaptor):
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
+        messages_content = _prepare_messages_for_model(messages)
         m = self._show(model)
         if m is None:
             logger.error("Ollama chat got unknown model: %s", model)
@@ -189,7 +218,7 @@ class OllamaAdaptor(ChatAdaptor):
 
         response = self.c.chat(
             model=model,
-            messages=messages,
+            messages=messages_content,
             stream=True,
             options=ollama.Options(
                 num_ctx=num_ctx,
@@ -216,6 +245,94 @@ class AnthropicAdaptor(ChatAdaptor):
     models: List[str]
     c: Anthropic
 
+    def _prepare_messages_for_model(
+        self,
+        messages: MessageList,
+    ) -> Tuple[List[TextBlockParam], List[MessageParam]]:
+        """
+        Return (system_prompt, message_list) in Anthropic client
+        format.
+        The Anthropic SDK expects the system prompt in a separate
+        argument, so return it separately.
+        In addition, return messages in the order they appear in
+        the chat.
+        """
+
+        sys_str = "\n\n".join(
+            [m.message for m in messages if isinstance(m, SystemMessage)]
+        )
+        system_prompt = [TextBlockParam(text=sys_str, type="text")]
+
+        output = []
+
+        for m in messages:
+            mp = None
+            match m:
+                case UserMessage():
+                    mp = MessageParam(
+                        role="user",
+                        content=m.message,
+                    )
+                case AssistantMessage():
+                    mp = MessageParam(
+                        role="assistant",
+                        content=m.message,
+                    )
+                case IncludedFile():
+                    p = self._prepare_documentblockparam(m.data)
+                    mp = MessageParam(
+                        role="user",
+                        content=[p],
+                    )
+                case IncludedImage():
+                    p = self._prepare_imageblockparam(m.path)
+                    mp = MessageParam(
+                        role="user",
+                        content=[p],
+                    )
+                case _:
+                    pass
+            if mp:
+                output.append(mp)
+
+        return (system_prompt, output)
+
+    def _prepare_documentblockparam(self, text: str) -> DocumentBlockParam:
+        return DocumentBlockParam(
+            type="document",
+            source=PlainTextSourceParam(
+                type="text",
+                media_type="text/plain",
+                data=text,
+            ),
+        )
+
+    def _prepare_imageblockparam(self, image_path: Path) -> ImageBlockParam:
+        """Convert image to base64 for Anthropic API"""
+        import base64
+
+        with open(image_path, "rb") as img_file:
+            base64_image = base64.b64encode(img_file.read()).decode("utf-8")
+
+        match image_path.suffix.lower():
+            case ".png":
+                mime_type = "image/png"
+            case ".gif":
+                mime_type = "image/gif"
+            case ".webp":
+                mime_type = "image/webp"
+            case ".jpg" | ".jpeg":
+                mime_type = "image/jpeg"
+            case other:
+                raise BadImageFormat(other)
+
+        return ImageBlockParam(
+            type="image",
+            source=Base64ImageSourceParam(
+                type="base64", media_type=mime_type, data=base64_image
+            ),
+        )
+
     def __init__(self):
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise MissingEnvVarException("ANTHROPIC_API_KEY")
@@ -232,19 +349,19 @@ class AnthropicAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
+    def supports_images(self, model: str) -> bool:
+        # All the Anthropic models we provide support images
+        return True
+
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
-        system_prompt = "\n\n".join(
-            [m["content"] for m in messages if m["role"] == "system"]
+        system_prompt, anth_messages = self._prepare_messages_for_model(
+            messages
         )
-        anth_messages = [
-            MessageParam(role=m["role"], content=m["content"])  # type: ignore
-            for m in messages
-            if m["role"] in ["user", "assistant"]
-        ]
+
         chunk_stream = self.c.messages.create(
             max_tokens=2048,
             messages=anth_messages,
@@ -323,11 +440,15 @@ class WatsonxAdaptor(ChatAdaptor):
     def list(self) -> List[str]:
         return self.models
 
+    def supports_images(self, model: str) -> bool:
+        return False
+
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
+        messages_content = _prepare_messages_for_model(messages)
         params = {
             "time_limit": 10000,
             "max_tokens": 4096,
@@ -344,7 +465,7 @@ class WatsonxAdaptor(ChatAdaptor):
         )
 
         try:
-            stream_response = fmodel.chat_stream(messages=messages)
+            stream_response = fmodel.chat_stream(messages=messages_content)
             for chunk in stream_response:
                 content = ""
                 input_tokens = None

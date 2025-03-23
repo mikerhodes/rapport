@@ -1,3 +1,12 @@
+# image formats supported by Claude
+IMAGE_FILE_EXTENSIONS = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+]
+
 TEXT_FILE_EXTENSIONS = [
     # Plain text
     ".txt",

@@ -1,5 +1,6 @@
 from io import StringIO
 import logging
+import traceback
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ from rapport.chatmodel import (
     AssistantMessage,
     Chat,
     IncludedFile,
+    IncludedImage,
     SystemMessage,
     UserMessage,
     new_chat,
@@ -83,9 +85,13 @@ def handle_submit_prompt():
     prompt = _s.user_prompt
 
     for f in prompt.files:
-        data = StringIO(f.getvalue().decode("utf-8")).read()
-        ext = f.name.split(".")[-1]
-        _insert_file_chat_message(data, f.name, ext)
+        file_ext = Path(f.name).suffix.lower()
+        if file_ext in consts.IMAGE_FILE_EXTENSIONS:
+            _insert_image_chat_message(f.getvalue(), f.name)
+        else:
+            data = StringIO(f.getvalue().decode("utf-8")).read()
+            ext = f.name.split(".")[-1]
+            _insert_file_chat_message(data, f.name, ext)
 
     # if the user just uploaded some files to the chat,
     # don't invoke the model.
@@ -136,6 +142,11 @@ def _handle_submit_include(prompt: str):
 
 def _insert_file_chat_message(data, fname, fext: str):
     _s.chat.messages.append(IncludedFile(name=fname, ext=fext, data=data))
+
+
+def _insert_image_chat_message(data: bytes, fname: str):
+    fpath = _s.history_manager.import_image(_s.chat.id, fname, data)
+    _s.chat.messages.append(IncludedImage(name=fname, path=fpath))
 
 
 def handle_change_model():
@@ -265,6 +276,12 @@ File `{m.name}` included in conversation:
 ```{m.ext}
 {m.data}
 ```
+                """
+            )
+        elif isinstance(m, IncludedImage):
+            lines.append(
+                f"""
+Image `{m.name}` included in conversation.
                 """
             )
         else:
@@ -424,6 +441,16 @@ with chat_col:
                     st.markdown(f"Included `{name}` in chat.")
                     with st.expander("View file content"):
                         st.markdown(f"```{ext}\n{data}\n```")
+            case IncludedImage(name=name, path=path, role=role):
+                with st.chat_message(role, avatar=":material/image:"):
+                    st.markdown(f"Included image `{name}` in chat.")
+                    if _s.chat_gateway.supports_images(_s.model):
+                        # make the image a bit smaller
+                        a, _ = st.columns([1, 2])
+                        with a:
+                            st.image(str(path))
+                    else:
+                        st.warning("Change model to use images.")
             case AssistantMessage() | UserMessage():
                 with st.chat_message(message.role):
                     st.markdown(message.message)
@@ -453,6 +480,8 @@ with chat_col:
                 save_current_chat()
                 # st.rerun()
             except Exception as e:
+                print(e)
+                print(traceback.format_exc())
                 print("The server could not be reached")
                 st.error(e)
 
@@ -487,9 +516,9 @@ except AttributeError:
     pass
 
 st.chat_input(
-    "Enter prompt here...",
+    "Your message",
     key="user_prompt",
     on_submit=handle_submit_prompt,
     accept_file="multiple",
-    file_type=consts.TEXT_FILE_EXTENSIONS,
+    file_type=consts.TEXT_FILE_EXTENSIONS + consts.IMAGE_FILE_EXTENSIONS,
 )
