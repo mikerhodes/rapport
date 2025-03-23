@@ -137,11 +137,14 @@ class ChatGateway:
 
 def _prepare_messages_for_model(
     messages: MessageList,
-) -> tuple[List[Dict[str, str]], List[IncludedImage]]:
+) -> List[Dict[str, str]]:
     """
     Converts message history format into format for model.
-    This implementation is generic. More advanced versions could
-    be implemented for multi-modal models like Claude.
+
+    This implementation only supports "basic" message types,
+    specifically ones that can be rendered to text. ChatAdaptors
+    that support more advanced models will need to add their
+    own implementations (see AnthropicAdaptor for an example).
     """
     # Models like things in this order:
     # - System
@@ -152,7 +155,6 @@ def _prepare_messages_for_model(
 
     system = [m for m in messages if isinstance(m, SystemMessage)]
     file = [m for m in messages if isinstance(m, IncludedFile)]
-    image = [m for m in messages if isinstance(m, IncludedImage)]
     chat = [
         m
         for m in messages
@@ -161,7 +163,8 @@ def _prepare_messages_for_model(
 
     result.extend([{"role": m.role, "content": m.message} for m in system])
     for m in file:
-        # Models don't have a file role, so convert
+        # This format seems to work well for models without
+        # a specific document type in their API.
         prompt = f"""
         `{m.name}`
         ---
@@ -170,7 +173,7 @@ def _prepare_messages_for_model(
         ---"""
         result.append({"role": m.role, "content": prompt})
     result.extend([{"role": m.role, "content": m.message} for m in chat])
-    return result, image
+    return result
 
 
 class OllamaAdaptor(ChatAdaptor):
@@ -204,7 +207,7 @@ class OllamaAdaptor(ChatAdaptor):
         model: str,
         messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
-        messages_content, _ = _prepare_messages_for_model(messages)
+        messages_content = _prepare_messages_for_model(messages)
         m = self._show(model)
         if m is None:
             logger.error("Ollama chat got unknown model: %s", model)
@@ -445,7 +448,7 @@ class WatsonxAdaptor(ChatAdaptor):
         model: str,
         messages: MessageList,
     ) -> Generator[MessageChunk, None, None]:
-        messages_content, _ = _prepare_messages_for_model(messages)
+        messages_content = _prepare_messages_for_model(messages)
         params = {
             "time_limit": 10000,
             "max_tokens": 4096,
