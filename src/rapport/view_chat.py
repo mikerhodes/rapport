@@ -463,7 +463,10 @@ with chat_col:
             case IncludedImage(name=name, path=path, role=role):
                 with st.chat_message(role, avatar=":material/image:"):
                     st.markdown(f"Included image `{name}` in chat.")
-                    st.image(str(path))
+                    if _s.chat_gateway.supports_images(_s.model):
+                        st.image(str(path))
+                    else:
+                        st.warning("Change model to use images.")
             case AssistantMessage() | UserMessage():
                 with st.chat_message(message.role):
                     st.markdown(message.message)
@@ -533,10 +536,5 @@ st.chat_input(
     key="user_prompt",
     on_submit=handle_submit_prompt,
     accept_file="multiple",
-    file_type=consts.TEXT_FILE_EXTENSIONS
-    + (
-        consts.IMAGE_FILE_EXTENSIONS
-        if _s.chat_gateway.supports_images(_s.model)
-        else []
-    ),
+    file_type=consts.TEXT_FILE_EXTENSIONS + consts.IMAGE_FILE_EXTENSIONS,
 )
