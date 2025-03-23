@@ -409,101 +409,78 @@ with st.sidebar:
     st.page_link(PAGE_HISTORY, label="More chats ->")
 
 
-chat_col, col2 = st.columns([3, 1])
-
-with col2:
-    st.markdown("""
-        Slash commands:
-
-        ```
-        /include /path/to/file
-        ```   
-
-        Include a file's content into the chat.
-
-        ```
-        /include /path *.glob
-        ```
-
-        Include several files from path using pattern glob.
-    """)
-
-
-with chat_col:
-    # Display chat messages from history on app rerun
-    for message in _s.chat.messages:
-        match message:
-            case SystemMessage(message=message):
-                with st.expander("View system prompt"):
-                    st.markdown(message)
-            case IncludedFile(name=name, ext=ext, data=data, role=role):
-                with st.chat_message(role, avatar=":material/upload_file:"):
-                    st.markdown(f"Included `{name}` in chat.")
-                    with st.expander("View file content"):
-                        st.markdown(f"```{ext}\n{data}\n```")
-            case IncludedImage(name=name, path=path, role=role):
-                with st.chat_message(role, avatar=":material/image:"):
-                    st.markdown(f"Included image `{name}` in chat.")
-                    if _s.chat_gateway.supports_images(_s.model):
-                        # make the image a bit smaller
-                        a, _ = st.columns([1, 2])
-                        with a:
-                            st.image(str(path))
-                    else:
-                        st.warning("Change model to use images.")
-            case AssistantMessage() | UserMessage():
-                with st.chat_message(message.role):
-                    st.markdown(message.message)
-
-    # Generate a reply and add to history
-    if _s.generate_assistant:
-        _s.generate_assistant = False
-
-        # Using the .empty() container ensures that once the
-        # model starts returning content, we replace the spinner
-        # with the streamed content. We then also need to write
-        # out the full message at the end (for some reason
-        # the message otherwise disappears).
-        with st.chat_message("assistant"), st.empty():
-            try:
-                with st.spinner("Thinking...", show_time=False):
-                    message = st.write_stream(stream_model_response())
-                st.write(message)
-                if isinstance(message, str):  # should always be
-                    _s.chat.messages.append(
-                        AssistantMessage(message=message)
-                    )
+# Display chat messages from history on app rerun
+for message in _s.chat.messages:
+    match message:
+        case SystemMessage(message=message):
+            with st.expander("View system prompt"):
+                st.markdown(message)
+        case IncludedFile(name=name, ext=ext, data=data, role=role):
+            with st.chat_message(role, avatar=":material/upload_file:"):
+                st.markdown(f"Included `{name}` in chat.")
+                with st.expander("View file content"):
+                    st.markdown(f"```{ext}\n{data}\n```")
+        case IncludedImage(name=name, path=path, role=role):
+            with st.chat_message(role, avatar=":material/image:"):
+                st.markdown(f"Included image `{name}` in chat.")
+                if _s.chat_gateway.supports_images(_s.model):
+                    # make the image a bit smaller
+                    a, _ = st.columns([1, 2])
+                    with a:
+                        st.image(str(path))
                 else:
-                    st.error(
-                        "Could not add message to chat as unexpected return type"
-                    )
-                save_current_chat()
-                # st.rerun()
-            except Exception as e:
-                print(e)
-                print(traceback.format_exc())
-                print("The server could not be reached")
-                st.error(e)
+                    st.warning("Change model to use images.")
+        case AssistantMessage() | UserMessage():
+            with st.chat_message(message.role):
+                st.markdown(message.message)
 
-    # Allow user to regenerate the last response.
-    if isinstance(_s.chat.messages[-1], AssistantMessage):
-        left, right = st.columns([3, 1])
-        with left:
-            used_tokens_holder = st.empty()
-            used_tokens_holder.caption(
-                "Used tokens: input {} / output: {}".format(
-                    _s.chat.input_tokens,
-                    _s.chat.output_tokens,
+# Generate a reply and add to history
+if _s.generate_assistant:
+    _s.generate_assistant = False
+
+    # Using the .empty() container ensures that once the
+    # model starts returning content, we replace the spinner
+    # with the streamed content. We then also need to write
+    # out the full message at the end (for some reason
+    # the message otherwise disappears).
+    with st.chat_message("assistant"), st.empty():
+        try:
+            with st.spinner("Thinking...", show_time=False):
+                message = st.write_stream(stream_model_response())
+            st.write(message)
+            if isinstance(message, str):  # should always be
+                _s.chat.messages.append(AssistantMessage(message=message))
+            else:
+                st.error(
+                    "Could not add message to chat as unexpected return type"
                 )
+            save_current_chat()
+            # st.rerun()
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            print("The server could not be reached")
+            st.error(e)
+
+# Allow user to regenerate the last response.
+if isinstance(_s.chat.messages[-1], AssistantMessage):
+    left, right = st.columns([3, 1])
+    with left:
+        used_tokens_holder = st.empty()
+        used_tokens_holder.caption(
+            "Used tokens: input {} / output: {}".format(
+                _s.chat.input_tokens,
+                _s.chat.output_tokens,
             )
-        with right:
-            st.button(
-                "Regenerate",
-                key="regenerate",
-                on_click=regenerate_last_response,
-                type="tertiary",
-                icon=":material/refresh:",
-            )
+        )
+    with right:
+        st.button(
+            "Regenerate",
+            key="regenerate",
+            on_click=regenerate_last_response,
+            type="tertiary",
+            icon=":material/refresh:",
+        )
 
 try:
     if _s.finish_reason == FinishReason.Length:

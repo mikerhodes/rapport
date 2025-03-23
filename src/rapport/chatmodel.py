@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 PAGE_CHAT = "view_chat.py"
 PAGE_HISTORY = "view_history.py"
 PAGE_CONFIG = "view_config.py"
+PAGE_HELP = "view_help.py"
 
 
 class SystemMessage(BaseModel):
@@ -50,7 +51,13 @@ class IncludedImage(BaseModel):
 # This tells pydantic that the `type` field is used to figure
 # out which of the message types to parse the JSON into.
 Message = Annotated[
-    Union[SystemMessage, UserMessage, AssistantMessage, IncludedFile, IncludedImage],
+    Union[
+        SystemMessage,
+        UserMessage,
+        AssistantMessage,
+        IncludedFile,
+        IncludedImage,
+    ],
     Field(discriminator="type"),
 ]
 

@@ -5,13 +5,13 @@ import streamlit as st
 
 from rapport.chathistory import ChatHistoryManager
 from rapport.chatgateway import ChatGateway
-from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HISTORY
+from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 from rapport.appconfig import ConfigStore
 
 logging.basicConfig(level=logging.INFO)
 
 st.set_page_config(
-    page_title="Rapport", page_icon=":robot_face:", layout="wide"
+    page_title="Rapport", page_icon=":robot_face:", layout="centered"
 )
 
 
@@ -35,6 +35,7 @@ pg = st.navigation(
         st.Page(PAGE_CHAT, title="Chat", icon=":material/chat_bubble:"),
         st.Page(PAGE_HISTORY, title="History", icon=":material/history:"),
         st.Page(PAGE_CONFIG, title="Settings", icon=":material/settings:"),
+        st.Page(PAGE_HELP, title="Help", icon=":material/help:"),
     ]
 )
 
