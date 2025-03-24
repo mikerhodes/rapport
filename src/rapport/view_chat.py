@@ -4,7 +4,7 @@ import traceback
 from pathlib import Path
 import shutil
 import subprocess
-from typing import cast, Optional
+from typing import List, cast, Optional
 
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
@@ -33,6 +33,7 @@ class State:
     chat_gateway: ChatGateway
     generate_assistant: bool
     model: str
+    models: List[str]
     history_manager: ChatHistoryManager
     finish_reason: FinishReason
     config_store: ConfigStore
@@ -48,7 +49,7 @@ _s = cast(State, st.session_state)
 #
 
 
-def clear_chat():
+def _handle_new_chat():
     """Clears the existing chat session"""
     del _s.chat
     # del st.session_state["chat"]
@@ -73,14 +74,14 @@ def stream_model_response():
         yield chunk.content
 
 
-def regenerate_last_response():
+def _handle_regenerate():
     """Regenerate the last assistant response"""
     # Remove the last assistant message
     _s.chat.messages = st.session_state["chat"].messages[:-1]
     _s.generate_assistant = True
 
 
-def handle_submit_prompt():
+def _handle_submit_prompt():
     # add latest message to history in format {role, content}
     prompt = _s.user_prompt
 
@@ -149,7 +150,7 @@ def _insert_image_chat_message(data: bytes, fname: str):
     _s.chat.messages.append(IncludedImage(name=fname, path=fpath))
 
 
-def handle_change_model():
+def _handle_change_model():
     model = _s.model
     _s.chat.model = model
 
@@ -194,13 +195,13 @@ def save_current_chat():
                 f.write(_chat_as_markdown())
 
 
-def load_chat(chat_id):
+def _handle_load_chat(chat_id):
     """Load a chat from history"""
     chat = _s.history_manager.get_chat(chat_id)
     if chat:
         _s.chat = chat
         _s.model = chat.model
-        handle_change_model()
+        _handle_change_model()
 
 
 def _handle_obsidian_download():
@@ -295,31 +296,32 @@ Image `{m.name}` included in conversation.
 #
 
 
-# Don't generate a chat message until the user has prompted
-if "generate_assistant" not in st.session_state:
-    _s.generate_assistant = False
+def init_state():
+    # Don't generate a chat message until the user has prompted
+    if "generate_assistant" not in st.session_state:
+        _s.generate_assistant = False
 
-# Retrieve the current models from ollama
-# Set a preferred model as default if there's none set
-last_used_model = _s.config_store.load_config().last_used_model
-models = _s.chat_gateway.list()
-if "model" not in st.session_state:
-    if last_used_model in models:
-        _s.model = last_used_model
-    else:
-        _s.model = models[0]
+    # Retrieve the current models from ollama
+    # Set a preferred model as default if there's none set
+    last_used_model = _s.config_store.load_config().last_used_model
+    _s.models = _s.chat_gateway.list()
+    if "model" not in st.session_state:
+        if last_used_model in _s.models:
+            _s.model = last_used_model
+        else:
+            _s.model = _s.models[0]
 
-# Really need to figure something better for state defaults
-if "load_chat_with_id" not in st.session_state:
-    _s.load_chat_with_id = None
-if chat_id := _s.load_chat_with_id:
-    _s.load_chat_with_id = None
-    load_chat(chat_id)
+    # Really need to figure something better for state defaults
+    if "load_chat_with_id" not in st.session_state:
+        _s.load_chat_with_id = None
+    if chat_id := _s.load_chat_with_id:
+        _s.load_chat_with_id = None
+        _handle_load_chat(chat_id)
 
-# Start a new chat if there isn't one active.
-# "New Chat" is implemented as `del st.session_state["chat"]`
-if "chat" not in st.session_state:
-    _s.chat = new_chat(_s.model)
+    # Start a new chat if there isn't one active.
+    # "New Chat" is implemented as `del st.session_state["chat"]`
+    if "chat" not in st.session_state:
+        _s.chat = new_chat(_s.model)
 
 
 #
@@ -327,117 +329,118 @@ if "chat" not in st.session_state:
 #
 
 
-with st.sidebar:
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.button(
-            "New Chat",
-            on_click=clear_chat,
-            icon=":material/edit_square:",
-            use_container_width=True,
-        )
-    with c2:
-        with st.popover(
-            "",
-            icon=":material/export_notes:",
-            disabled=len(_s.chat.messages) < 2,
-        ):
-            st.download_button(
-                "Download",
-                _chat_as_markdown(),
-                file_name="rapport_download.md",
-                mime="text/markdown",
-                use_container_width=True,
-                icon=":material/download:",
-                on_click="ignore",
-            )
+def render_sidebar():
+    with st.sidebar:
+        c1, c2 = st.columns([3, 1])
+        with c1:
             st.button(
-                "Copy to clipboard",
-                on_click=_handle_copy_to_clipboard,
-                icon=":material/content_copy:",
+                "New Chat",
+                on_click=_handle_new_chat,
+                icon=":material/edit_square:",
                 use_container_width=True,
             )
-            obsidian_av = (
-                _s.config_store.load_config().obsidian_directory is not None
-            )
-            st.button(
-                "Obsidian"
-                if obsidian_av
-                else "Set Obsidian directory to save to Obsidian",
-                on_click=_handle_obsidian_download,
-                icon=":material/check:"
-                if _s.chat.export_location
-                else ":material/add_circle:",
-                use_container_width=True,
-                disabled=not obsidian_av,
-            )
-            gh_tool_available = shutil.which("gh") is not None
-            st.button(
-                "Upload as gist"
-                if gh_tool_available
-                else "Install gh tool to enable gist upload",
-                on_click=_handle_create_gist,
-                icon=":material/cloud_upload:",
-                use_container_width=True,
-                disabled=not gh_tool_available,
-            )
-    st.selectbox(
-        "Choose your model",
-        models,
-        key="model",
-        on_change=handle_change_model,
-    )
-
-    # Display recent chats
-    st.markdown("## Recent Chats")
-    recent_chats = _s.history_manager.get_recent_chats(limit=3)
-
-    for chat in recent_chats:
-        # Highlight current chat
-        icon = None
-        if chat["id"] == _s.chat.id:
-            icon = ":material/edit:"
-        st.button(
-            chat["title"],
-            key=f"chat_{chat['id']}",
-            on_click=load_chat,
-            args=(chat["id"],),
-            use_container_width=True,
-            icon=icon,
+        with c2:
+            with st.popover(
+                "",
+                icon=":material/export_notes:",
+                disabled=len(_s.chat.messages) < 2,
+            ):
+                st.download_button(
+                    "Download",
+                    _chat_as_markdown(),
+                    file_name="rapport_download.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                    icon=":material/download:",
+                    on_click="ignore",
+                )
+                st.button(
+                    "Copy to clipboard",
+                    on_click=_handle_copy_to_clipboard,
+                    icon=":material/content_copy:",
+                    use_container_width=True,
+                )
+                obsidian_av = (
+                    _s.config_store.load_config().obsidian_directory
+                    is not None
+                )
+                st.button(
+                    "Obsidian"
+                    if obsidian_av
+                    else "Set Obsidian directory to save to Obsidian",
+                    on_click=_handle_obsidian_download,
+                    icon=":material/check:"
+                    if _s.chat.export_location
+                    else ":material/add_circle:",
+                    use_container_width=True,
+                    disabled=not obsidian_av,
+                )
+                gh_tool_available = shutil.which("gh") is not None
+                st.button(
+                    "Upload as gist"
+                    if gh_tool_available
+                    else "Install gh tool to enable gist upload",
+                    on_click=_handle_create_gist,
+                    icon=":material/cloud_upload:",
+                    use_container_width=True,
+                    disabled=not gh_tool_available,
+                )
+        st.selectbox(
+            "Choose your model",
+            _s.models,
+            key="model",
+            on_change=_handle_change_model,
         )
 
-    st.page_link(PAGE_HISTORY, label="More chats ->")
+        # Display recent chats
+        st.markdown("## Recent Chats")
+        recent_chats = _s.history_manager.get_recent_chats(limit=3)
+
+        for chat in recent_chats:
+            # Highlight current chat
+            icon = None
+            if chat["id"] == _s.chat.id:
+                icon = ":material/edit:"
+            st.button(
+                chat["title"],
+                key=f"chat_{chat['id']}",
+                on_click=_handle_load_chat,
+                args=(chat["id"],),
+                use_container_width=True,
+                icon=icon,
+            )
+
+        st.page_link(PAGE_HISTORY, label="More chats ->")
 
 
-# Display chat messages from history on app rerun
-for message in _s.chat.messages:
-    match message:
-        case SystemMessage(message=message):
-            with st.expander("View system prompt"):
-                st.markdown(message)
-        case IncludedFile(name=name, ext=ext, data=data, role=role):
-            with st.chat_message(role, avatar=":material/upload_file:"):
-                st.markdown(f"Included `{name}` in chat.")
-                with st.expander("View file content"):
-                    st.markdown(f"```{ext}\n{data}\n```")
-        case IncludedImage(name=name, path=path, role=role):
-            with st.chat_message(role, avatar=":material/image:"):
-                st.markdown(f"Included image `{name}` in chat.")
-                if _s.chat_gateway.supports_images(_s.model):
-                    # make the image a bit smaller
-                    a, _ = st.columns([1, 2])
-                    with a:
-                        st.image(str(path))
-                else:
-                    st.warning("Change model to use images.")
-        case AssistantMessage() | UserMessage():
-            with st.chat_message(message.role):
-                st.markdown(message.message)
+def render_chat_messages():
+    # Display chat messages from history on app rerun
+    for message in _s.chat.messages:
+        match message:
+            case SystemMessage(message=message):
+                with st.expander("View system prompt"):
+                    st.markdown(message)
+            case IncludedFile(name=name, ext=ext, data=data, role=role):
+                with st.chat_message(role, avatar=":material/upload_file:"):
+                    st.markdown(f"Included `{name}` in chat.")
+                    with st.expander("View file content"):
+                        st.markdown(f"```{ext}\n{data}\n```")
+            case IncludedImage(name=name, path=path, role=role):
+                with st.chat_message(role, avatar=":material/image:"):
+                    st.markdown(f"Included image `{name}` in chat.")
+                    if _s.chat_gateway.supports_images(_s.model):
+                        # make the image a bit smaller
+                        a, _ = st.columns([1, 2])
+                        with a:
+                            st.image(str(path))
+                    else:
+                        st.warning("Change model to use images.")
+            case AssistantMessage() | UserMessage():
+                with st.chat_message(message.role):
+                    st.markdown(message.message)
 
-# Generate a reply and add to history
-if _s.generate_assistant:
-    _s.generate_assistant = False
 
+def generate_assistant_message():
     # Using the .empty() container ensures that once the
     # model starts returning content, we replace the spinner
     # with the streamed content. We then also need to write
@@ -462,8 +465,8 @@ if _s.generate_assistant:
             print("The server could not be reached")
             st.error(e)
 
-# Allow user to regenerate the last response.
-if isinstance(_s.chat.messages[-1], AssistantMessage):
+
+def render_assistant_message_footer():
     left, right = st.columns([3, 1])
     with left:
         used_tokens_holder = st.empty()
@@ -477,25 +480,43 @@ if isinstance(_s.chat.messages[-1], AssistantMessage):
         st.button(
             "Regenerate",
             key="regenerate",
-            on_click=regenerate_last_response,
+            on_click=_handle_regenerate,
             type="tertiary",
             icon=":material/refresh:",
         )
 
-try:
-    if _s.finish_reason == FinishReason.Length:
-        st.warning(
-            "Model stopped because maximum tokens reached.",
-            icon=":material/warning:",
-        )
-    del _s.finish_reason
-except AttributeError:
-    pass
+    try:
+        if _s.finish_reason == FinishReason.Length:
+            st.warning(
+                "Model stopped because maximum tokens reached.",
+                icon=":material/warning:",
+            )
+        del _s.finish_reason
+    except AttributeError:
+        pass
 
-st.chat_input(
-    "Your message",
-    key="user_prompt",
-    on_submit=handle_submit_prompt,
-    accept_file="multiple",
-    file_type=consts.TEXT_FILE_EXTENSIONS + consts.IMAGE_FILE_EXTENSIONS,
-)
+
+def render_chat_input():
+    st.chat_input(
+        "Your message",
+        key="user_prompt",
+        on_submit=_handle_submit_prompt,
+        accept_file="multiple",
+        file_type=consts.TEXT_FILE_EXTENSIONS + consts.IMAGE_FILE_EXTENSIONS,
+    )
+
+
+def main():
+    init_state()
+    render_sidebar()
+    render_chat_messages()
+    if _s.generate_assistant:
+        _s.generate_assistant = False
+        generate_assistant_message()
+    if isinstance(_s.chat.messages[-1], AssistantMessage):
+        render_assistant_message_footer()
+    render_chat_input()
+
+
+if __name__ == "__page__":
+    main()
