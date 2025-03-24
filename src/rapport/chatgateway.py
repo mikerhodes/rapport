@@ -401,11 +401,13 @@ class AnthropicAdaptor(ChatAdaptor):
 
 class WatsonxAdaptor(ChatAdaptor):
     c: Optional[wai.APIClient]
+    model_cache: Dict[str, waifm.ModelInference]
     models: List[str]
     apikey: str
 
     def __init__(self):
         self.c = None
+        self.model_cache = {}
 
         if k := os.environ.get("WATSONX_IAM_API_KEY"):
             self.apikey = k
@@ -443,17 +445,14 @@ class WatsonxAdaptor(ChatAdaptor):
     def supports_images(self, model: str) -> bool:
         return False
 
-    def chat(
-        self,
-        model: str,
-        messages: MessageList,
-    ) -> Generator[MessageChunk, None, None]:
-        messages_content = _prepare_messages_for_model(messages)
+    def _model_inference(self, model: str) -> waifm.ModelInference:
+        if m := self.model_cache.get(model):
+            return m
+
         params = {
             "time_limit": 10000,
             "max_tokens": 4096,
-        }  # hopefully enough tokens
-
+        }
         verify = True
         fmodel = waifm.ModelInference(
             model_id=model,
@@ -463,7 +462,16 @@ class WatsonxAdaptor(ChatAdaptor):
             space_id=self.space_id,
             verify=verify,
         )
+        self.model_cache[model] = fmodel
+        return fmodel
 
+    def chat(
+        self,
+        model: str,
+        messages: MessageList,
+    ) -> Generator[MessageChunk, None, None]:
+        messages_content = _prepare_messages_for_model(messages)
+        fmodel = self._model_inference(model)
         try:
             stream_response = fmodel.chat_stream(messages=messages_content)
             for chunk in stream_response:
