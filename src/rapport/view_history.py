@@ -1,4 +1,4 @@
-from datetime import datetime
+from typing import List, Dict
 
 import streamlit as st
 
@@ -26,35 +26,46 @@ def load_chat(chat_id):
     st.session_state["switch_to_page"] = PAGE_CHAT
 
 
-# Display recent chats
-st.title("History")
-recent_chats = st.session_state["history_manager"].get_recent_chats(
-    limit=100
-)
+#
+# Display page
+#
 
 
-for chat in recent_chats:
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        # Highlight current chat
-        icon = None
-        current_chat = st.session_state.get("chat", None)
-        if current_chat and chat["id"] == current_chat.id:
-            icon = ":material/edit:"
-        b = st.button(
-            chat["title"],
-            key=f"chat_chathistory_{chat['id']}",
-            on_click=load_chat,
-            args=[chat["id"]],
-            use_container_width=True,
-            icon=icon,
-        )
-    with col2:
-        st.button(
-            "",
-            key=f"delete_chathistory_{chat['id']}",
-            on_click=delete_chat,
-            args=[chat["id"]],
-            icon=":material/delete:",
-            type="tertiary",
-        )
+def main():
+    st.title("History")
+    recent_chats = st.session_state["history_manager"].get_recent_chats(
+        limit=100
+    )
+    show_chat_history(recent_chats)
+
+
+def show_chat_history(recent_chats: List[Dict]):
+    for chat in recent_chats:
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            # Highlight current chat
+            icon = None
+            current_chat = st.session_state.get("chat", None)
+            if current_chat and chat["id"] == current_chat.id:
+                icon = ":material/edit:"
+            st.button(
+                chat["title"],
+                key=f"chat_chathistory_{chat['id']}",
+                on_click=load_chat,
+                args=(chat["id"],),
+                use_container_width=True,
+                icon=icon,
+            )
+        with col2:
+            st.button(
+                "",
+                key=f"delete_chathistory_{chat['id']}",
+                on_click=delete_chat,
+                args=(chat["id"],),
+                icon=":material/delete:",
+                type="tertiary",
+            )
+
+
+if __name__ == "__page__":
+    main()
