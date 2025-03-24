@@ -363,7 +363,7 @@ class AnthropicAdaptor(ChatAdaptor):
         )
 
         chunk_stream = self.c.messages.create(
-            max_tokens=2048,
+            max_tokens=10240,
             messages=anth_messages,
             model=model,
             stream=True,
@@ -451,7 +451,7 @@ class WatsonxAdaptor(ChatAdaptor):
 
         params = {
             "time_limit": 10000,
-            "max_tokens": 4096,
+            "max_tokens": 10240,
         }
         verify = True
         fmodel = waifm.ModelInference(
