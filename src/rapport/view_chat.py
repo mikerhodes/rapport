@@ -305,6 +305,10 @@ def init_state():
     # Set a preferred model as default if there's none set
     last_used_model = _s.config_store.load_config().last_used_model
     _s.models = _s.chat_gateway.list()
+    if not _s.models:
+        raise Exception(
+            "No models available; run ollama or add Anthropic/watsonx credential environment variables."
+        )
     if "model" not in st.session_state:
         if last_used_model in _s.models:
             _s.model = last_used_model
@@ -507,15 +511,20 @@ def render_chat_input():
 
 
 def main():
-    init_state()
-    render_sidebar()
-    render_chat_messages()
-    if _s.generate_assistant:
-        _s.generate_assistant = False
-        generate_assistant_message()
-    if isinstance(_s.chat.messages[-1], AssistantMessage):
-        render_assistant_message_footer()
-    render_chat_input()
+    try:
+        init_state()
+        render_sidebar()
+        render_chat_messages()
+        if _s.generate_assistant:
+            _s.generate_assistant = False
+            generate_assistant_message()
+        if isinstance(_s.chat.messages[-1], AssistantMessage):
+            render_assistant_message_footer()
+        render_chat_input()
+    except Exception as e:
+        print(e)
+        print(traceback.format_exc())
+        st.error(e, icon=":material/error:")
 
 
 if __name__ == "__page__":
