@@ -4,8 +4,9 @@ import traceback
 from pathlib import Path
 import shutil
 import subprocess
-from typing import List, cast, Optional
+from typing import Generator, Iterable, List, cast, Optional
 
+from pandas.core.frame import itertools
 import streamlit as st
 from streamlit.elements.widgets.chat import ChatInputValue
 
@@ -72,6 +73,21 @@ def stream_model_response():
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
         yield chunk.content
+
+
+def wait_n_and_chain(n, g_original) -> Iterable:
+    # This allows us to wait for the first item in a "thinking" spinner
+    # and then pass all the generated values to write_stream separately.
+    # Get the first value
+    g1 = []
+    try:
+        for _ in range(n):
+            g1.append(next(g_original))
+    except StopIteration:
+        # Return what we have via chain
+        pass
+
+    return itertools.chain(g1, g_original)
 
 
 def _handle_regenerate():
@@ -448,16 +464,14 @@ def generate_assistant_message():
     with st.chat_message("assistant"), st.empty():
         try:
             with st.spinner("Thinking...", show_time=False):
-                message = st.write_stream(stream_model_response())
-            st.write(message)
-            if isinstance(message, str):  # should always be
-                _s.chat.messages.append(AssistantMessage(message=message))
+                g = wait_n_and_chain(5, stream_model_response())
+            m = st.write_stream(g)
+            # st.write(message)
+            if isinstance(m, str):  # should always be
+                _s.chat.messages.append(AssistantMessage(message=m))
             else:
-                st.error(
-                    "Could not add message to chat as unexpected return type"
-                )
+                st.error("Bad chat return type; not added to chat.")
             save_current_chat()
-            # st.rerun()
         except Exception as e:
             print(e)
             print(traceback.format_exc())
