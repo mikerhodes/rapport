@@ -173,14 +173,9 @@ def generate_chat_title(chat: Chat) -> str:
     if not user_messages:
         return chat.title  # return existing title if can't do better
 
-    # Take first 6 words of first message
+    # Take first line of user message
     first_message = user_messages[0].message
-    words = first_message.split()[:10]
-    title = " ".join(words)
-
-    # Add ellipsis if we truncated the message
-    if len(words) < len(first_message.split()):
-        title += "..."
+    title = first_message.split("\n")[0]
 
     return title
 
@@ -406,7 +401,7 @@ def render_sidebar():
             if chat["id"] == _s.chat.id:
                 icon = ":material/edit:"
             st.button(
-                chat["title"],
+                " ".join(chat["title"].split()[:6]) + "...",
                 key=f"chat_{chat['id']}",
                 on_click=_handle_load_chat,
                 args=(chat["id"],),
