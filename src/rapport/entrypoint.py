@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 st.set_page_config(
     page_title="Rapport", page_icon=":robot_face:", layout="centered"
 )
+st.set_option("client.toolbarMode", "minimal")
 
 
 base_dir = Path.home() / ".config" / "rapport"
