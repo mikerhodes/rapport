@@ -363,7 +363,7 @@ class AnthropicAdaptor(ChatAdaptor):
         )
 
         chunk_stream = self.c.messages.create(
-            max_tokens=10240,
+            max_tokens=8192,
             messages=anth_messages,
             model=model,
             stream=True,
