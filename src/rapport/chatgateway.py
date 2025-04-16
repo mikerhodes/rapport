@@ -11,6 +11,7 @@ import ollama
 from anthropic import Anthropic
 from anthropic.types import (
     Base64ImageSourceParam,
+    CacheControlEphemeralParam,
     DocumentBlockParam,
     ImageBlockParam,
     MessageParam,
@@ -294,6 +295,23 @@ class AnthropicAdaptor(ChatAdaptor):
                     pass
             if mp:
                 output.append(mp)
+
+        # If last message is user, apply prompt caching
+        match output[-1]:
+            case {"role": "user", "content": c}:
+                print("applying prompt caching")
+                output[-1] = MessageParam(
+                    role="user",
+                    content=[
+                        TextBlockParam(
+                            type="text",
+                            text=c,
+                            cache_control=CacheControlEphemeralParam(
+                                type="ephemeral"
+                            ),
+                        )
+                    ],
+                )
 
         return (system_prompt, output)
 
