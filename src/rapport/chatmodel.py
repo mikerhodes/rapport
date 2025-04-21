@@ -90,5 +90,8 @@ def new_chat(model: str) -> Chat:
 
 prompt_path = Path(__file__).parent / "systemprompt.md"
 with open(prompt_path, "r") as file:
-    system_prompt = file.read()
+    system_prompt = [file.read()]
+system_prompt.extend(["- Use latex to render equations."])
+system_prompt = "\n".join(system_prompt)
+
 SYSTEM = SystemMessage(message=system_prompt)
