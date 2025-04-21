@@ -63,16 +63,27 @@ def stream_model_response():
         model=_s.chat.model,
         messages=_s.chat.messages,
     )
-    for chunk in (
-        response
-    ):  # prompt eval count is the token count used from the model
+
+    # chunkier chunks so we don't force redraw too often, and we can
+    # avoid ending chunks on escape characters like \ (to ensure that
+    # things like latex \[ are complete in any chunk)
+    chunkier_chunk = ""
+    for chunk in response:
         if chunk.input_tokens is not None:
             _s.chat.input_tokens = chunk.input_tokens
         if chunk.output_tokens is not None:
             _s.chat.output_tokens = chunk.output_tokens
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
-        yield chunk.content
+
+        # print(chunk.content)
+        chunkier_chunk += chunk.content
+        if not chunkier_chunk.endswith("\\") and len(chunkier_chunk) > 60:
+            chunkier_chunk = post_process_chunk(chunkier_chunk)
+            yield chunkier_chunk
+            chunkier_chunk = ""
+
+    yield chunkier_chunk  # don't forget the last chunk
 
 
 def wait_n_and_chain(n, g_original) -> Iterable:
@@ -173,6 +184,32 @@ def _handle_change_model():
     c = _s.config_store.load_config()
     c.last_used_model = model
     _s.config_store.save_config(c)
+
+
+def post_process_chunk(s: str) -> str:
+    s = openai_math_markup(s)
+    return s
+
+
+def openai_math_markup(s: str) -> str:
+    """
+    Support OpenAI latex markup (mostly equations) in
+    return chunks by substituting the latex fences
+    used in the OpenAI markdown with the fences used
+    in streamlit.
+    """
+    # Support both inline and block markup. OpenAI uses
+    # \[...equation perhaps surrounded by newline...\]
+    # \(...equation perhaps surrounded by newline...\)
+    #
+    # Streamlit uses $ or $$. $$ works for both inline and
+    # separate equation blocks, use that.
+    return (
+        s.replace(r"\[", "$$")
+        .replace(r"\]", "$$")
+        .replace(r"\(", "$$")
+        .replace(r"\)", "$$")
+    )
 
 
 #
@@ -464,7 +501,7 @@ def generate_assistant_message():
     with st.chat_message("assistant"), st.empty():
         try:
             with st.spinner("Thinking...", show_time=False):
-                g = wait_n_and_chain(5, stream_model_response())
+                g = wait_n_and_chain(2, stream_model_response())
             m = st.write_stream(g)
             # st.write(message)
             if isinstance(m, str):  # should always be
