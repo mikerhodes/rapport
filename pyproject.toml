@@ -10,7 +10,7 @@ dependencies = [
     "ollama>=0.4.7",
     "openai>=1.74.0",
     "pydantic>=2.6.0",
-    "streamlit>=1.42.0",
+    "streamlit==1.43",
     "watchdog>=6.0.0",
 ]
 
