@@ -573,5 +573,5 @@ def main():
         st.error(e, icon=":material/error:")
 
 
-if __name__ == "__page__":
+if __name__ == "__main__":
     main()

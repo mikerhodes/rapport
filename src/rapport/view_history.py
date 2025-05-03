@@ -126,5 +126,5 @@ def show_chat_history(recent_chats: List[Dict]):
             )
 
 
-if __name__ == "__page__":
+if __name__ == "__main__":
     main()
