@@ -2,15 +2,19 @@
 
 Rapport is a simple python LLM chatbot interface. It uses Ollama to run LLMs locally and Streamlit to create the chatbot user interface.
 
-I built this because I'm excited by the idea that one can now (Jan 2025) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
+I built this because I'm excited by the idea that one can now (Jan 2024) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
 
-- Support Ollama, Anthropic, OpenAI and IBM watsonx.
+- Support for multiple LLM providers:
+  - Ollama (local models)
+  - Anthropic (Claude models)
+  - OpenAI (GPT models)
+  - IBM watsonx (Granite, Llama, etc.)
 - Chat history saved for 180 days to JSON.
 - File uploads.
   - Text files are supported for all models by inserting the content into the chat.
   - Image files are supported for Anthropic and OpenAI. There's an issue for [images in Ollama models][olim].
 - Regenerate assistant chat messages (the models might be good, but they still emit duds!).
-- Select between installed Ollama models, or use the Anthropic or watsonx services (bring your own API keys).
+- Select between installed Ollama models, or use cloud services like Anthropic, OpenAI, or watsonx (bring your own API keys).
 - Customise the system prompt by editing `systemprompt.md`.
 - Export the chat as markdown:
   - Download via browser.
@@ -29,13 +33,39 @@ I built this because I'm excited by the idea that one can now (Jan 2025) run pre
 
 To enable Anthropic models, set an `ANTHROPIC_API_KEY` environment variable to your Anthropic API key.
 
+Rapport supports the following Claude models:
+- `claude-3-7-sonnet-latest`
+- `claude-3-5-sonnet-latest`
+- `claude-3-5-haiku-latest`
+
+All Claude models in Rapport support image input capabilities.
+
 ### OpenAI
 
-To enable OpenAI models, set an `OPENAI_API_KEY` environment variable to your OpenAI API key.
+To enable OpenAI models, set an `OPENAI_API_KEY` environment variable to your OpenAI API key. 
+
+Rapport supports several OpenAI models including:
+- `gpt-4.1`
+- `gpt-4.1-mini`
+- `gpt-4.1-nano`
+- `gpt-4o-mini`
+- `gpt-4o`
+
+OpenAI models in Rapport support image input capabilities.
 
 ### Watsonx
 
-To enable watsonx models, set both `WATSONX_IAM_API_KEY` and `WATSONX_PROJECT` environment variables to an IAM API key (such as a personal API key) and watsonx project respectively. The watsonx project must have an associate watsonx Runtime to work (the Runtime is what runs inference, and other things, in watsonx).
+To enable watsonx models, you need to set up the following environment variables:
+
+1. `WATSONX_IAM_API_KEY`: Your IBM watsonx IAM API key (can be a personal API key)
+2. `WATSONX_PROJECT`: Your watsonx project ID
+
+The watsonx project must have an associated watsonx Runtime to work (the Runtime is what runs inference in watsonx). Rapport currently supports several watsonx models including:
+
+- `ibm/granite-3-8b-instruct`
+- `meta-llama/llama-3-3-70b-instruct`
+
+The watsonx service endpoints are configured to use the EU region by default (`https://eu-gb.ml.cloud.ibm.com`).
 
 ### Ollama
 
