@@ -78,11 +78,12 @@ class Chat(BaseModel):
     output_tokens: int = 0
 
 
-def new_chat(model: str) -> Chat:
+def new_chat(model: str, custom_prompt: Optional[str] = None) -> Chat:
     """Initialise and return a new Chat"""
+    system_message = get_system_message(custom_prompt)
     return Chat(
         model=model,
-        messages=[SYSTEM],
+        messages=[system_message],
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
@@ -90,8 +91,18 @@ def new_chat(model: str) -> Chat:
 
 prompt_path = Path(__file__).parent / "systemprompt.md"
 with open(prompt_path, "r") as file:
-    system_prompt = [file.read()]
-system_prompt.extend(["- Use latex to render equations."])
-system_prompt = "\n".join(system_prompt)
+    default_system_prompt = file.read()
 
-SYSTEM = SystemMessage(message=system_prompt)
+def get_system_message(custom_prompt=None):
+    """Get system message, using custom prompt if provided"""
+    if custom_prompt:
+        system_prompt = custom_prompt
+    else:
+        system_prompt = [default_system_prompt]
+        system_prompt.extend(["- Use latex to render equations."])
+        system_prompt = "\n".join(system_prompt)
+    
+    return SystemMessage(message=system_prompt)
+
+# Initialize with default system prompt
+SYSTEM = get_system_message()
