@@ -23,6 +23,18 @@ with st.form("settings_form"):
         placeholder="Enter your preferred AI model",
     )
 
+    st.subheader("System Prompt")
+    
+    st.markdown("Custom system prompt (leave blank to use default)")
+    custom_system_prompt = st.text_area(
+        "Custom system prompt",
+        value=config.custom_system_prompt or "",
+        placeholder="Enter your custom system prompt",
+        height=200,
+        help="Leave blank to use the default system prompt from systemprompt.md",
+        label_visibility="collapsed",
+    )
+    
     st.subheader("Obsidian integration")
 
     obsidian_directory = st.text_input(
@@ -42,6 +54,9 @@ with st.form("settings_form"):
             if obsidian_directory
             else None,
             last_used_model=config.last_used_model,
+            custom_system_prompt=custom_system_prompt
+            if custom_system_prompt
+            else None,
         )
 
         # Save to disk
@@ -54,6 +69,7 @@ with st.expander("Help"):
     **Configuration Options:**
 
     - **Preferred Model**: The default AI model to use for chats
+    - **Custom System Prompt**: Override the default system prompt with your own
     - **Obsidian Directory**: Path to your Obsidian vault for integration
 
     Settings are stored in `~/.config/rapport/config.json`

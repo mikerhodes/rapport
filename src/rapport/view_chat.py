@@ -53,6 +53,10 @@ _s = cast(State, st.session_state)
 def _handle_new_chat():
     """Clears the existing chat session"""
     del _s.chat
+    # Get custom system prompt from config if available
+    config = _s.config_store.load_config()
+    custom_prompt = config.custom_system_prompt
+    _s.chat = new_chat(_s.model, custom_prompt)
     # del st.session_state["chat"]
 
 
@@ -373,7 +377,10 @@ def init_state():
     # Start a new chat if there isn't one active.
     # "New Chat" is implemented as `del st.session_state["chat"]`
     if "chat" not in st.session_state:
-        _s.chat = new_chat(_s.model)
+        # Get custom system prompt from config if available
+        config = _s.config_store.load_config()
+        custom_prompt = config.custom_system_prompt
+        _s.chat = new_chat(_s.model, custom_prompt)
 
 
 #
