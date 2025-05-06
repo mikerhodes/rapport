@@ -620,6 +620,11 @@ class WatsonxAdaptor(ChatAdaptor):
         else:
             raise MissingEnvVarException("WATSONX_PROJECT")
 
+        if k := os.environ.get("WATSONX_URL"):
+            self.url = k
+        else:
+            raise MissingEnvVarException("WATSONX_URL")
+
         # don't support this for now
         self.space_id = None
 
@@ -634,7 +639,7 @@ class WatsonxAdaptor(ChatAdaptor):
             return self.c
 
         credentials = wai.Credentials(
-            url="https://eu-gb.ml.cloud.ibm.com",
+            url=self.url,
             api_key=self.apikey,
         )
         self.c = wai.APIClient(credentials)

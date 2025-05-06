@@ -59,13 +59,12 @@ To enable watsonx models, you need to set up the following environment variables
 
 1. `WATSONX_IAM_API_KEY`: Your IBM watsonx IAM API key (can be a personal API key)
 2. `WATSONX_PROJECT`: Your watsonx project ID
+3. `WATSONX_URL`: The URL for your watsonx instance (e.g., `https://eu-gb.ml.cloud.ibm.com`)
 
 The watsonx project must have an associated watsonx Runtime to work (the Runtime is what runs inference in watsonx). Rapport currently supports several watsonx models including:
 
 - `ibm/granite-3-8b-instruct`
 - `meta-llama/llama-3-3-70b-instruct`
-
-The watsonx service endpoints are configured to use the EU region by default (`https://eu-gb.ml.cloud.ibm.com`).
 
 ### Ollama
 
