@@ -23,18 +23,14 @@ with st.form("settings_form"):
         placeholder="Enter your preferred AI model",
     )
 
-    st.subheader("System Prompt")
-    
-    st.markdown("Custom system prompt (leave blank to use default)")
     custom_system_prompt = st.text_area(
-        "Custom system prompt",
+        "Details you want the model to know about you:",
         value=config.custom_system_prompt or "",
-        placeholder="Enter your custom system prompt",
-        height=200,
-        help="Leave blank to use the default system prompt from systemprompt.md",
-        label_visibility="collapsed",
+        placeholder="Enter things about you (eg, 'I like Python') or customisations to the model's behaviour (eg, 'be sarcastic a lot')",
+        height=150,
+        help="Feel free to phrase this using 'I', such as 'I like cats'",
     )
-    
+
     st.subheader("Obsidian integration")
 
     obsidian_directory = st.text_input(
