@@ -450,7 +450,7 @@ def render_sidebar():
 
         # Display recent chats
         st.markdown("## Recent Chats")
-        recent_chats = _s.history_manager.get_recent_chats(limit=3)
+        recent_chats = _s.history_manager.get_recent_chats(limit=2)
 
         for chat in recent_chats:
             # Highlight current chat
