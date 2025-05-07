@@ -34,6 +34,13 @@ st.logo(
     size="large",
     icon_image="images/rapport-logo.png",
 )
+st.html("""
+  <style>
+    [alt=Logo] {
+      height: 3rem;
+    }
+  </style>
+        """)
 
 pg = st.navigation(
     [
