@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Union, List, Optional, Literal, Annotated
 from pydantic import BaseModel, Field
 
+from rapport.appconfig import ConfigStore
+
 PAGE_CHAT = "view_chat.py"
 PAGE_HISTORY = "view_history.py"
 PAGE_CONFIG = "view_config.py"
@@ -78,12 +80,19 @@ class Chat(BaseModel):
     output_tokens: int = 0
 
 
-def new_chat(model: str, custom_prompt: Optional[str] = None) -> Chat:
+def new_chat(model: str, config_store: ConfigStore) -> Chat:
     """Initialise and return a new Chat"""
+
+    # Get custom system prompt from config if available
+    config = config_store.load_config()
+    custom_prompt = config.custom_system_prompt
+
     system_message = get_system_message(custom_prompt)
     return Chat(
         model=model,
-        messages=[system_message],
+        messages=[
+            system_message,
+        ],
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
@@ -93,16 +102,21 @@ prompt_path = Path(__file__).parent / "systemprompt.md"
 with open(prompt_path, "r") as file:
     default_system_prompt = file.read()
 
-def get_system_message(custom_prompt=None):
+
+def get_system_message(extra_prompt=None):
     """Get system message, using custom prompt if provided"""
-    if custom_prompt:
-        system_prompt = custom_prompt
-    else:
-        system_prompt = [default_system_prompt]
-        system_prompt.extend(["- Use latex to render equations."])
-        system_prompt = "\n".join(system_prompt)
-    
+    system_prompt = default_system_prompt.format(
+        extra_prompt=extra_prompt,
+        current_date=datetime.now().strftime("%Y-%m-%d"),
+    )
+    # system_prompt = [
+    #     extra_prompt if extra_prompt else default_system_prompt,
+    #     "Use latex to render equations.",
+    #     f"The current date is {datetime.today().isoformat()}.",
+    # ]
+    # system_prompt = "\n\n".join(system_prompt)
     return SystemMessage(message=system_prompt)
+
 
 # Initialize with default system prompt
 SYSTEM = get_system_message()
