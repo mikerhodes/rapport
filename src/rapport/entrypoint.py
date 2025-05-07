@@ -11,7 +11,9 @@ from rapport.appconfig import ConfigStore
 logging.basicConfig(level=logging.INFO)
 
 st.set_page_config(
-    page_title="Rapport", page_icon=":robot_face:", layout="centered"
+    page_title="Rapport",
+    page_icon="images/rapport-favicon.png",
+    layout="centered",
 )
 st.set_option("client.toolbarMode", "minimal")
 
@@ -28,7 +30,9 @@ if sp:
     st.switch_page(sp)
 
 st.logo(
-    image="images/logo.png", size="large", icon_image="images/logo-small.png"
+    image="images/rapport-logo.png",
+    size="large",
+    icon_image="images/rapport-logo.png",
 )
 
 pg = st.navigation(
