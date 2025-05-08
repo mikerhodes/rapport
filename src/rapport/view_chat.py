@@ -374,9 +374,6 @@ def init_state():
     # Start a new chat if there isn't one active.
     # "New Chat" is implemented as `del st.session_state["chat"]`
     if "chat" not in st.session_state:
-        # Get custom system prompt from config if available
-        config = _s.config_store.load_config()
-        custom_prompt = config.custom_system_prompt
         _s.chat = new_chat(_s.model, _s.config_store)
 
 

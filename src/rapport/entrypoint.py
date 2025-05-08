@@ -56,6 +56,7 @@ pg = st.navigation(
 # inserts a spinner element into the tree.
 @st.cache_resource(show_spinner=False)
 def gateway():
+    print("Init chat gateway")
     return ChatGateway()
 
 
@@ -74,7 +75,6 @@ if "config_store" not in st.session_state:
 if "history_manager" not in st.session_state:
     st.session_state["history_manager"] = history_store()
 if "chat_gateway" not in st.session_state:
-    print("Init chat gateway")
     st.session_state["chat_gateway"] = gateway()
 
 
