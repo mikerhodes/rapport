@@ -240,7 +240,7 @@ class OllamaAdaptor(ChatAdaptor):
             return
         # Truncate the context length to reduce memory usage
         # TODO make this an option?
-        num_ctx = min(8192, m.context_length)
+        num_ctx = min(2048, m.context_length)
 
         response = self.c.chat(
             model=model,
