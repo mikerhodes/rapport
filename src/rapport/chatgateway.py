@@ -362,18 +362,18 @@ class OpenAIAdaptor(ChatAdaptor):
 
         remaining = [m for m in messages if not isinstance(m, SystemMessage)]
         for m in remaining:
-            match m:
-                case UserMessage():
+            match m.type:
+                case "UserMessage":
                     x = ChatCompletionUserMessageParam(
                         role="user", content=m.message
                     )
                     result.append(x)
-                case AssistantMessage():
+                case "AssistantMessage":
                     x = ChatCompletionAssistantMessageParam(
                         role="assistant", content=m.message
                     )
                     result.append(x)
-                case IncludedFile():
+                case "IncludedFile":
                     # This format seems to work well for models without
                     # a specific document type in their API.
                     prompt = f"""
@@ -386,7 +386,7 @@ class OpenAIAdaptor(ChatAdaptor):
                         role="user", content=prompt
                     )
                     result.append(x)
-                case IncludedImage():
+                case "IncludedImage":
                     result.append(self._prepare_imageblockparam(m.path))
 
         return result
@@ -451,24 +451,24 @@ class AnthropicAdaptor(ChatAdaptor):
 
         for m in messages:
             mp = None
-            match m:
-                case UserMessage():
+            match m.type:
+                case "UserMessage":
                     mp = MessageParam(
                         role="user",
                         content=m.message,
                     )
-                case AssistantMessage():
+                case "AssistantMessage":
                     mp = MessageParam(
                         role="assistant",
                         content=m.message,
                     )
-                case IncludedFile():
+                case "IncludedFile":
                     p = self._prepare_documentblockparam(m.data)
                     mp = MessageParam(
                         role="user",
                         content=[p],
                     )
-                case IncludedImage():
+                case "IncludedImage":
                     p = self._prepare_imageblockparam(m.path)
                     mp = MessageParam(
                         role="user",

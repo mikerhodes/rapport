@@ -469,26 +469,31 @@ def render_sidebar():
 def render_chat_messages():
     # Display chat messages from history on app rerun
     for message in _s.chat.messages:
-        match message:
-            case SystemMessage(message=message):
+        # Use the type discriminator field to determine the message type
+        match message.type:
+            case "SystemMessage":
                 with st.expander("View system prompt"):
-                    st.markdown(message)
-            case IncludedFile(name=name, ext=ext, data=data, role=role):
-                with st.chat_message(role, avatar=":material/upload_file:"):
-                    st.markdown(f"Included `{name}` in chat.")
+                    st.markdown(message.message)
+            case "IncludedFile":
+                with st.chat_message(
+                    message.role, avatar=":material/upload_file:"
+                ):
+                    st.markdown(f"Included `{message.name}` in chat.")
                     with st.expander("View file content"):
-                        st.markdown(f"```{ext}\n{data}\n```")
-            case IncludedImage(name=name, path=path, role=role):
-                with st.chat_message(role, avatar=":material/image:"):
-                    st.markdown(f"Included image `{name}` in chat.")
+                        st.markdown(f"```{message.ext}\n{message.data}\n```")
+            case "IncludedImage":
+                with st.chat_message(
+                    message.role, avatar=":material/image:"
+                ):
+                    st.markdown(f"Included image `{message.name}` in chat.")
                     if _s.chat_gateway.supports_images(_s.model):
                         # make the image a bit smaller
                         a, _ = st.columns([1, 2])
                         with a:
-                            st.image(str(path))
+                            st.image(str(message.path))
                     else:
                         st.warning("Change model to use images.")
-            case AssistantMessage() | UserMessage():
+            case "AssistantMessage" | "UserMessage":
                 with st.chat_message(message.role):
                     st.markdown(message.message)
 
