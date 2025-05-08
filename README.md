@@ -2,9 +2,9 @@
 
 Rapport is a simple python LLM chatbot interface. It uses Ollama to run LLMs locally and Streamlit to create the chatbot user interface.
 
-I built this because I'm excited by the idea that one can now (Jan 2025) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. This app is nothing special, and there are a million streamlit LLM demo chat apps around, but it's got:
+I started building this because I was excited by the idea that one could (as of Jan 2025) run pretty competent LLM models on a laptop. While this app was originally just a learning exercise, I built enough bits that I'm using it day to day. I also built out connections to a few remote providers so I could try out frontier models. Some of what it has:
 
-- Support for multiple LLM providers:
+- Support for multiple LLM providers (bring your own API key for remote providers):
   - Ollama (local models)
   - Anthropic (Claude models)
   - OpenAI (GPT models)
@@ -14,8 +14,7 @@ I built this because I'm excited by the idea that one can now (Jan 2025) run pre
   - Text files are supported for all models by inserting the content into the chat.
   - Image files are supported for Anthropic and OpenAI. There's an issue for [images in Ollama models][olim].
 - Regenerate assistant chat messages (the models might be good, but they still emit duds!).
-- Select between installed Ollama models, or use cloud services like Anthropic, OpenAI, or watsonx (bring your own API keys).
-- Customise the system prompt by editing `systemprompt.md`.
+- Customise the system prompt by adding extra content via Settings.
 - Export the chat as markdown:
   - Download via browser.
   - Set up folder for export (eg in Obsidian vault). Once a chat is marked for export, the exported file is updated as the chat continues.
