@@ -2,3 +2,7 @@
 # Whether to send usage statistics to Streamlit.
 # Default: true
 gatherUsageStats = false
+
+# [theme]
+# this is the logo icon background colour; but applying disables dark mode
+# secondaryBackgroundColor = "#d4c8b8"
