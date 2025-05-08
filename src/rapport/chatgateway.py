@@ -632,6 +632,7 @@ class WatsonxAdaptor(ChatAdaptor):
         self.models = [
             "ibm/granite-3-8b-instruct",
             "meta-llama/llama-3-3-70b-instruct",
+            "mistralai/mistral-medium-2505",
         ]
 
     def _client(self):
