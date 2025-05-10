@@ -80,11 +80,21 @@ class Chat(BaseModel):
     output_tokens: int = 0
 
 
-def new_chat(model: str, config_store: ConfigStore) -> Chat:
+def new_chat(available_models: List[str], config_store: ConfigStore) -> Chat:
     """Initialise and return a new Chat"""
+    config = config_store.load_config()
+
+    # Pick a model
+    preferred_model = config.preferred_model
+    last_used_model = config.last_used_model
+    if preferred_model in available_models:
+        model = preferred_model
+    elif last_used_model in available_models:
+        model = last_used_model
+    else:
+        model = available_models[0]
 
     # Get custom system prompt from config if available
-    config = config_store.load_config()
     custom_prompt = config.custom_system_prompt
 
     system_message = get_system_message(custom_prompt)

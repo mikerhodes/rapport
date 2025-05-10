@@ -53,8 +53,8 @@ _s = cast(State, st.session_state)
 def _handle_new_chat():
     """Clears the existing chat session"""
     del _s.chat
-    _s.chat = new_chat(_s.model, _s.config_store)
-    # del st.session_state["chat"]
+    _s.chat = new_chat(_s.models, _s.config_store)
+    _s.model = _s.chat.model
 
 
 def stream_model_response():
@@ -350,19 +350,11 @@ def init_state():
     if "generate_assistant" not in st.session_state:
         _s.generate_assistant = False
 
-    # Retrieve the current models from ollama
-    # Set a preferred model as default if there's none set
-    last_used_model = _s.config_store.load_config().last_used_model
     _s.models = _s.chat_gateway.list()
     if not _s.models:
         raise Exception(
             "No models available; run ollama or add Anthropic/watsonx credential environment variables."
         )
-    if "model" not in st.session_state:
-        if last_used_model in _s.models:
-            _s.model = last_used_model
-        else:
-            _s.model = _s.models[0]
 
     # Really need to figure something better for state defaults
     if "load_chat_with_id" not in st.session_state:
@@ -374,7 +366,8 @@ def init_state():
     # Start a new chat if there isn't one active.
     # "New Chat" is implemented as `del st.session_state["chat"]`
     if "chat" not in st.session_state:
-        _s.chat = new_chat(_s.model, _s.config_store)
+        _s.chat = new_chat(_s.models, _s.config_store)
+    _s.model = _s.chat.model
 
 
 #
