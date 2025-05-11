@@ -4,7 +4,7 @@ import traceback
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Generator, Iterable, List, cast, Optional
+from typing import Iterable, List, cast, Optional
 
 from pandas.core.frame import itertools
 import streamlit as st
@@ -19,7 +19,6 @@ from rapport.chatmodel import (
     Chat,
     IncludedFile,
     IncludedImage,
-    SystemMessage,
     UserMessage,
     new_chat,
 )
