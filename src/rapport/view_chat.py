@@ -1,4 +1,5 @@
 from io import StringIO
+import json
 import logging
 import traceback
 from pathlib import Path
@@ -19,6 +20,8 @@ from rapport.chatmodel import (
     Chat,
     IncludedFile,
     IncludedImage,
+    ToolCallMessage,
+    ToolResultMessage,
     UserMessage,
     new_chat,
 )
@@ -249,6 +252,35 @@ def _handle_load_chat(chat_id):
     if chat:
         _s.chat = chat
         _s.model = chat.model
+        
+        # Insert sample tool call messages for testing rendering
+        from rapport.chatmodel import ToolCallMessage, ToolResultMessage
+        
+        # Insert a sample tool call and result after the first user message
+        for i, msg in enumerate(chat.messages):
+            if msg.type == "UserMessage" and i > 0:
+                # Insert sample tool call after this user message
+                sample_tool_call = ToolCallMessage(
+                    tool="search_web",
+                    parameters={"query": "rapport chat app tutorial", "num_results": 5}
+                )
+                
+                sample_tool_result = ToolResultMessage(
+                    tool="search_web",
+                    result=[
+                        {"title": "Building Chat Applications with Rapport", "url": "https://example.com/rapport-tutorial"},
+                        {"title": "Chat App Development Guide", "url": "https://example.com/chat-dev-guide"},
+                        {"title": "Real-time Messaging with Rapport", "url": "https://example.com/rapport-messaging"}
+                    ]
+                )
+                
+                # Insert sample messages after the user message
+                chat.messages.insert(i + 1, sample_tool_call)
+                chat.messages.insert(i + 2, sample_tool_result)
+                break
+        
+        _s.chat = chat
+        _s.model = chat.model
         _handle_change_model()
 
 
@@ -331,6 +363,26 @@ File `{m.name}` included in conversation:
             lines.append(
                 f"""
 Image `{m.name}` included in conversation.
+                """
+            )
+        elif m.type == "ToolCallMessage":
+            lines.append(
+                f"""
+Tool Call: `{m.tool}`
+
+```json
+{json.dumps(m.parameters, indent=2)}
+```
+                """
+            )
+        elif m.type == "ToolResultMessage":
+            lines.append(
+                f"""
+Tool Result: `{m.tool}`
+
+```json
+{json.dumps(m.result, indent=2)}
+```
                 """
             )
         else:
@@ -485,6 +537,20 @@ def render_chat_messages():
                             st.image(str(message.path))
                     else:
                         st.warning("Change model to use images.")
+            case "ToolCallMessage":
+                with st.chat_message(
+                    message.role, avatar=":material/build:"
+                ):
+                    st.markdown(f"**Tool Call: {message.tool}**")
+                    with st.expander("Tool Parameters"):
+                        st.json(message.parameters)
+            case "ToolResultMessage":
+                with st.chat_message(
+                    message.role, avatar=":material/done_all:"
+                ):
+                    st.markdown(f"**Tool Result: {message.tool}**")
+                    with st.expander("Tool Results"):
+                        st.json(message.result)
             case "AssistantMessage" | "UserMessage":
                 with st.chat_message(message.role):
                     st.markdown(message.message)
