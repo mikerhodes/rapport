@@ -3,12 +3,14 @@ from pathlib import Path
 
 import streamlit as st
 
+from rapport import tools
 from rapport.chathistory import ChatHistoryManager
 from rapport.chatgateway import ChatGateway
 from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 from rapport.appconfig import ConfigStore
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 st.set_page_config(
     page_title="Rapport",
@@ -77,5 +79,6 @@ if "history_manager" not in st.session_state:
 if "chat_gateway" not in st.session_state:
     st.session_state["chat_gateway"] = gateway()
 
+tools.registry.initialise_tools(st.session_state["config_store"])
 
 pg.run()

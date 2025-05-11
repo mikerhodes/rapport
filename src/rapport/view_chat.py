@@ -1,28 +1,34 @@
-from io import StringIO
+import json
 import logging
-import traceback
-from pathlib import Path
 import shutil
 import subprocess
-from typing import Iterable, List, cast, Optional
+import traceback
+from io import StringIO
+from pathlib import Path
+from typing import Iterable, Iterator, List, Optional, cast
 
-from pandas.core.frame import itertools
+import more_itertools
+from pandas.core.base import textwrap
 import streamlit as st
+from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
 
-from rapport import consts
+from rapport import consts, tools
 from rapport.appconfig import ConfigStore
 from rapport.chatgateway import ChatGateway, FinishReason
+from rapport.chathistory import ChatHistoryManager
 from rapport.chatmodel import (
     PAGE_HISTORY,
     AssistantMessage,
     Chat,
     IncludedFile,
     IncludedImage,
+    ToolCallMessage,
+    ToolResultMessage,
     UserMessage,
     new_chat,
+    Message,
 )
-from rapport.chathistory import ChatHistoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +44,7 @@ class State:
     finish_reason: FinishReason
     config_store: ConfigStore
     load_chat_with_id: Optional[str]
+    outstanding_tool_calls: List[ToolCallMessage]
 
 
 # _s acts as a typed accessor for session state.
@@ -62,6 +69,7 @@ def stream_model_response():
     response = _s.chat_gateway.chat(
         model=_s.chat.model,
         messages=_s.chat.messages,
+        tools=tools.registry.get_enabled_tools(),
     )
 
     # chunkier chunks so we don't force redraw too often, and we can
@@ -75,6 +83,8 @@ def stream_model_response():
             _s.chat.output_tokens = chunk.output_tokens
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
+        if chunk.tool_call is not None:
+            _s.outstanding_tool_calls.append(chunk.tool_call)
 
         # print(chunk.content)
         chunkier_chunk += chunk.content
@@ -317,21 +327,41 @@ def _chat_as_markdown() -> str:
     lines.append(f"# {generate_chat_title(chat)}\n")
     for m in chat.messages:
         lines.append(f"**{m.role}**\n")
-        if isinstance(m, IncludedFile):
+        if m.type == "IncludedFile":
             lines.append(
-                f"""
-File `{m.name}` included in conversation:
+                textwrap.dedent(f"""
+                File `{m.name}` included in conversation:
 
-```{m.ext}
-{m.data}
-```
-                """
+                ```{m.ext}
+                {m.data}
+                ```
+                """)
             )
-        elif isinstance(m, IncludedImage):
+        elif m.type == "IncludedImage":
             lines.append(
-                f"""
-Image `{m.name}` included in conversation.
-                """
+                textwrap.dedent(f"""
+                Image `{m.name}` included in conversation.
+                """)
+            )
+        elif m.type == "ToolCallMessage":
+            lines.append(
+                textwrap.dedent(f"""
+                Tool Call: `{m.name}`
+
+                ```json
+                {json.dumps(m.parameters, indent=2)}
+                ```
+                """)
+            )
+        elif m.type == "ToolResultMessage":
+            lines.append(
+                textwrap.dedent(f"""
+                Tool Result: `{m.name}`
+
+                ```json
+                {m.result}
+                ```
+                """)
             )
         else:
             lines.append(m.message)
@@ -348,6 +378,8 @@ def init_state():
     # Don't generate a chat message until the user has prompted
     if "generate_assistant" not in st.session_state:
         _s.generate_assistant = False
+    if "outstanding_tool_calls" not in st.session_state:
+        _s.outstanding_tool_calls = []
 
     _s.models = _s.chat_gateway.list()
     if not _s.models:
@@ -459,59 +491,155 @@ def render_sidebar():
 
 
 def render_chat_messages():
-    # Display chat messages from history on app rerun
-    for message in _s.chat.messages:
+    p = more_itertools.peekable(_s.chat.messages)
+    for message in p:
         # Use the type discriminator field to determine the message type
         match message.type:
             case "SystemMessage":
                 with st.expander("View system prompt"):
                     st.markdown(message.message)
-            case "IncludedFile":
-                with st.chat_message(
-                    message.role, avatar=":material/upload_file:"
-                ):
-                    st.markdown(f"Included `{message.name}` in chat.")
-                    with st.expander("View file content"):
-                        st.markdown(f"```{message.ext}\n{message.data}\n```")
-            case "IncludedImage":
-                with st.chat_message(
-                    message.role, avatar=":material/image:"
-                ):
-                    st.markdown(f"Included image `{message.name}` in chat.")
+            case "UserMessage" | "IncludedFile" | "IncludedImage":
+                _render_user_message_block(message, p)
+            case "AssistantMessage" | "ToolCallMessage":
+                _render_assistant_message_block(message, p)
+
+
+def _render_user_message_block(
+    first: UserMessage | IncludedFile | IncludedImage,
+    p: more_itertools.peekable,
+):
+    """
+    Renders a group of UserMessage, IncludedFile and IncludeImage
+    messages into a single user chat block. Consumes the messages
+    from `p`.
+    """
+    m = first
+    with st.chat_message("user"):
+        while True:
+            match m.type:
+                case "UserMessage":
+                    st.markdown(m.message)
+                case "IncludedFile":
+                    with st.expander(f"Included `{m.name}` in chat."):
+                        st.markdown(f"```{m.ext}\n{m.data}\n```")
+                case "IncludedImage":
                     if _s.chat_gateway.supports_images(_s.model):
                         # make the image a bit smaller
                         a, _ = st.columns([1, 2])
                         with a:
-                            st.image(str(message.path))
+                            st.image(str(m.path))
                     else:
                         st.warning("Change model to use images.")
-            case "AssistantMessage" | "UserMessage":
-                with st.chat_message(message.role):
-                    st.markdown(message.message)
+            # If no more items in iterable, or it's
+            # not an assistant-type message, break
+            if not p:
+                break
+            match p.peek().type:
+                # We are still in the assistant's turn
+                case "UserMessage" | "IncludedFile" | "IncludedImage":
+                    m = next(p)
+                    continue
+                case _:
+                    break
+
+
+def _render_assistant_message_block(
+    first: AssistantMessage | ToolCallMessage,
+    p: more_itertools.peekable,
+):
+    """
+    Renders a group of AssistantMessage and tool call messages
+    into a single assistant chat block. Consumes the messages
+    from `p`.
+    """
+    # Render tool calls inline if we find them following this
+    # message. We peek the iterator in the while loop, advancing
+    # it if we find tool calls to render.
+    # This displays tool calls nicely inline with the model text
+    # referencing them.
+    m = first
+    with st.chat_message("assistant"):
+        while True:
+            match m.type:
+                case "AssistantMessage":
+                    st.markdown(m.message)
+                case "ToolCallMessage":
+                    _render_tool_call(m, next(p))
+            # If no more items in iterable, or it's
+            # not an assistant-type message, break
+            if not p:
+                break
+            match p.peek().type:
+                # We are still in the assistant's turn
+                case "AssistantMessage" | "ToolCallMessage":
+                    m = next(p)
+                    continue
+                case _:
+                    break
+
+
+def _render_tool_call(tool_call, tool_response):
+    with st.expander(f"**Tool Call: {tool_call.name}**"):
+        st.caption("Parameters")
+        st.code(tool_call.parameters)
+        if tool_response is not None:
+            st.caption("Result")
+            st.code(tool_response.result, height=400)
 
 
 def generate_assistant_message():
-    # Using the .empty() container ensures that once the
-    # model starts returning content, we replace the spinner
-    # with the streamed content. We then also need to write
-    # out the full message at the end (for some reason
-    # the message otherwise disappears).
-    with st.chat_message("assistant"), st.empty():
-        try:
-            with st.spinner("Thinking...", show_time=False):
-                g = wait_n_and_chain(2, stream_model_response())
-            m = st.write_stream(g)
-            # st.write(message)
-            if isinstance(m, str):  # should always be
-                _s.chat.messages.append(AssistantMessage(message=m))
-            else:
-                st.error("Bad chat return type; not added to chat.")
+    with st.chat_message("assistant"):
+        turns = 20  # limit tool-calling turns for safety
+        while turns:
+            turns -= 1
+
+            try:
+                # stream_model_response accumulates tool calls
+                # in _s.outstanding_tool_calls
+                with st.spinner("Thinking...", show_time=False):
+                    g = wait_n_and_chain(2, stream_model_response())
+                m = st.write_stream(g)
+
+                # should be str, might be empty if model immediately
+                # does a tool call.
+                if isinstance(m, str):
+                    if m:  # only add if model sent text content
+                        _s.chat.messages.append(AssistantMessage(message=m))
+                else:
+                    logger.error("Bad chat return type; not added to chat.")
+
+            except Exception as e:
+                print(e)
+                print(traceback.format_exc())
+                print("The server could not be reached")
+                st.error(e)
+
+            tool_use = len(_s.outstanding_tool_calls) > 0
+
+            for tool_call in _s.outstanding_tool_calls:
+                try:
+                    result = ToolResultMessage(
+                        id=tool_call.id,
+                        name=tool_call.name,
+                        result=tools.registry.execute_tool(
+                            tool_call.name,
+                            tool_call.parameters,
+                        ),
+                    )
+                    _s.chat.messages.extend([tool_call, result])
+                    _render_tool_call(tool_call, result)
+                except ValueError as ex:
+                    logger.error("Error running tool:", ex)
+
+            _s.outstanding_tool_calls.clear()
+
             save_current_chat()
-        except Exception as e:
-            print(e)
-            print(traceback.format_exc())
-            print("The server could not be reached")
-            st.error(e)
+
+            # If we have tool use, go around again
+            if tool_use:
+                continue
+            else:
+                break
 
 
 def render_assistant_message_footer():
