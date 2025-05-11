@@ -9,6 +9,7 @@ I started building this because I was excited by the idea that one could (as of 
   - Anthropic (Claude models)
   - OpenAI (GPT models)
   - IBM watsonx (Granite, Llama, etc.)
+- Tool-calling support via MCP servers (Anthropic)
 - Chat history saved for 180 days to JSON.
 - File uploads.
   - Text files are supported for all models by inserting the content into the chat.
@@ -109,3 +110,62 @@ As `uv run` installs dependencies, run the app using:
 ```
 uv run rapport
 ```
+
+## Tool Integration
+
+Rapport supports tool use, allowing LLM models to use external tools to perform actions like web searches, calculations, or accessing external data.
+
+### How Tools Work in Rapport
+
+Rapport uses the [Model Context Protocol][mcp] (MCP) protocol to add tools.
+
+1. Tools are provided via MCP servers, which are configured in the application settings.
+2. When enabled, compatible LLM models can call these tools during chat conversations.
+3. Tool results are displayed in the chat and passed back to the model.
+
+[mcp]: https://modelcontextprotocol.io/introduction
+
+### Configuring MCP Servers
+
+Available MCP servers are configured in Rapport's settings, on the MCP Servers tab.
+
+#### Stdio-based MCP servers
+
+These are configured with a command to start the server and arguments.
+
+```json
+    "mcpstdio": {
+        "command": "uv",
+        "args": ["run", "mcpstdio.py"],
+        "allowed_tools": ["download_url"]
+    }
+```
+
+(This will run the `mcpstdio.py` server in this repo).
+
+- `command`: the main binary to start.
+- `args`: an array of strings of the arguments to pass `command`.
+- `allowed_tools`: a list of allowed tool names. Rapport will not allow the model to call tools that are not in this list. If the model doesn't appear to be using a tool correctly, check the tool is in the allowed list. Rapport's logs show the discovered tools at startup.
+
+
+#### URL-based MCP servers
+
+These connect to an external server providing tools via HTTP:
+
+```json
+{
+  "my_mcp_server": {
+    "url": "http://localhost:9000/mcp/",
+    "allowed_tools": ["add", "mul"]
+  }
+}
+```
+
+(Start this example server using `uv run mcphttp.py`).
+
+- `url`: the URL of the server. Currently Rapport does not support authentication.
+- `allowed_tools`: a list of allowed tool names. Rapport will not allow the model to call tools that are not in this list. If the model doesn't appear to be using a tool correctly, check the tool is in the allowed list. Rapport's logs show the discovered tools at startup.
+
+### Using Tools in Chat
+
+No special user prompting is required to use tools - the model will determine when a tool might help answer your query.

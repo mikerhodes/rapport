@@ -7,8 +7,7 @@ Trying to keep this indepdent from streamlit.
 from datetime import datetime
 from importlib import resources
 from pathlib import Path
-from typing import Annotated, List, Literal, Optional, Union
-
+from typing import Union, List, Optional, Literal, Annotated, Dict, Any
 from pydantic import BaseModel, Field
 
 from rapport.appconfig import ConfigStore
@@ -52,6 +51,22 @@ class IncludedImage(BaseModel):
     type: Literal["IncludedImage"] = "IncludedImage"
 
 
+class ToolCallMessage(BaseModel):
+    id: str
+    name: str
+    parameters: Dict[str, Any]
+    role: Literal["assistant"] = "assistant"
+    type: Literal["ToolCallMessage"] = "ToolCallMessage"
+
+
+class ToolResultMessage(BaseModel):
+    id: str
+    name: str
+    result: str
+    role: Literal["tool"] = "tool"
+    type: Literal["ToolResultMessage"] = "ToolResultMessage"
+
+
 # This tells pydantic that the `type` field is used to figure
 # out which of the message types to parse the JSON into.
 Message = Annotated[
@@ -61,6 +76,8 @@ Message = Annotated[
         AssistantMessage,
         IncludedFile,
         IncludedImage,
+        ToolCallMessage,
+        ToolResultMessage,
     ],
     Field(discriminator="type"),
 ]
