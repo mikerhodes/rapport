@@ -59,8 +59,9 @@ class ToolCallMessage(BaseModel):
 
 
 class ToolResultMessage(BaseModel):
-    tool: str
-    result: Any
+    id: str
+    name: str
+    result: str
     role: Literal["tool"] = "tool"
     type: Literal["ToolResultMessage"] = "ToolResultMessage"
 
