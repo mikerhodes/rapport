@@ -67,7 +67,7 @@ def get_enabled_tools(enabled_tool_names: List[str]) -> List[Tool]:
     # return [t for t in get_available_tools() if t.name in enabled_tool_names]
 
 
-def execute_tool(tool_name: str, params: Dict[str, Any]) -> Any:
+def execute_tool(tool_name: str, params: Dict[str, Any]) -> str:
     """Execute a tool with the given parameters"""
     if tool_name not in TOOL_FUNCTIONS:
         raise ValueError(f"Unknown tool: {tool_name}")
@@ -75,4 +75,4 @@ def execute_tool(tool_name: str, params: Dict[str, Any]) -> Any:
     # validate correct params?
 
     func = TOOL_FUNCTIONS[tool_name]
-    return func(**params)
+    return str(func(**params))

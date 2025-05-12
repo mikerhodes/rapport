@@ -65,10 +65,11 @@ class ChatHistoryManager:
             # Create a copy of the chat object with filtered messages
             chat_copy = chat.model_copy()
             chat_copy.messages = [
-                msg for msg in chat.messages 
-                if msg.type not in ["ToolCallMessage", "ToolResultMessage"]
+                msg
+                for msg in chat.messages
+                # if msg.type not in ["ToolCallMessage", "ToolResultMessage"]
             ]
-            
+
             # Use Pydantic's model_dump with mode='json' for serialization
             chat_json = chat_copy.model_dump(mode="json")
             json.dump(chat_json, f, indent=2)
