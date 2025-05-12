@@ -6,18 +6,18 @@ from pathlib import Path
 from typing import (
     Dict,
     Generator,
+    Iterable,
     List,
     Optional,
     Protocol,
     Tuple,
     cast,
-    Iterable,
 )
 
 import ibm_watsonx_ai as wai
 import ibm_watsonx_ai.foundation_models as waifm
-import openai
 import ollama
+import openai
 from anthropic import Anthropic
 from anthropic.types import (
     Base64ImageSourceParam,
@@ -43,6 +43,8 @@ from rapport.chatmodel import (
     IncludedImage,
     MessageList,
     SystemMessage,
+    ToolCallMessage,
+    ToolResultMessage,
     UserMessage,
 )
 
@@ -67,6 +69,7 @@ class MessageChunk:
     output_tokens: Optional[int]
     content: str
     finish_reason: Optional[FinishReason]
+    tool_call: Optional[ToolCallMessage]
 
 
 class ChatAdaptor(Protocol):
@@ -563,41 +566,120 @@ class AnthropicAdaptor(ChatAdaptor):
             messages
         )
 
+        from rapport import tools
+
+        tools = [x.render_anthropic() for x in tools.get_enabled_tools([])]
+
         chunk_stream = self.c.messages.create(
             max_tokens=8192,
             messages=anth_messages,
             model=model,
             stream=True,
             system=system_prompt,
+            tools=tools,
         )
         input_tokens = 0
+
+        from enum import Enum
+        import json
+
+        class StreamState(Enum):
+            START = 1
+            TEXT = 2
+            TOOL = 3
+
+        state = StreamState.START
+        tool_call_id = ""
+        tool_call_name = ""
+        tool_call_input = ""
+
         for event in chunk_stream:
             # logger.info(event.type)
             content = ""
             finish_reason = None
             output_tokens = None
 
-            match event.type:
-                case "message_start":
-                    input_tokens = event.message.usage.input_tokens
-                case "content_block_delta" if (
-                    event.delta.type == "text_delta"
-                ):
-                    content = event.delta.text
-                case "message_delta":
-                    output_tokens = event.usage.output_tokens
-                    match event.delta.stop_reason:
-                        case "max_tokens":
-                            finish_reason = FinishReason.Length
+            match state:
+                case StreamState.START:
+                    match event.type:
+                        case "message_start":
+                            input_tokens = event.message.usage.input_tokens
+                        case "content_block_start" if (
+                            event.content_block.type == "text"
+                        ):
+                            # new text content
+                            state = StreamState.TEXT
+                        case "content_block_start" if (
+                            event.content_block.type == "tool_use"
+                        ):
+                            # new tool call
+                            state = StreamState.TOOL
+                            tool_call_id = event.content_block.id
+                            tool_call_name = event.content_block.name
+                            tool_call_input = ""
+                        case "message_delta":
+                            output_tokens = event.usage.output_tokens
+                            match event.delta.stop_reason:
+                                case "max_tokens":
+                                    finish_reason = FinishReason.Length
+                                case _:
+                                    finish_reason = FinishReason.Stop
+                        case "message_stop":
+                            pass  # should be the last message
                         case _:
-                            finish_reason = FinishReason.Stop
-
-            yield MessageChunk(
-                content=content,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                finish_reason=finish_reason,
-            )
+                            print(event)
+                    yield MessageChunk(
+                        content="",
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        finish_reason=finish_reason,
+                        tool_call=None,
+                    )
+                case StreamState.TEXT:
+                    match event.type:
+                        case "content_block_delta" if (
+                            event.delta.type == "text_delta"
+                        ):
+                            content = event.delta.text
+                            yield MessageChunk(
+                                content=content,
+                                input_tokens=None,
+                                output_tokens=None,
+                                finish_reason=None,
+                                tool_call=None,
+                            )
+                        case "content_block_stop":
+                            state = StreamState.START
+                        case _:
+                            print(event)
+                case StreamState.TOOL:
+                    match event.type:
+                        case "content_block_delta" if (
+                            event.delta.type == "input_json_delta"
+                        ):
+                            tool_call_input += event.delta.partial_json
+                        case "content_block_stop":
+                            print(
+                                "tool_call:",
+                                tool_call_id,
+                                tool_call_name,
+                                tool_call_input,
+                            )
+                            yield MessageChunk(
+                                content="",
+                                input_tokens=None,
+                                output_tokens=None,
+                                finish_reason=None,
+                                tool_call=ToolCallMessage(
+                                    id=tool_call_id,
+                                    name=tool_call_name,
+                                    parameters=json.loads(tool_call_input),
+                                ),
+                            )
+                            # yield tool use
+                            state = StreamState.START
+                        case _:
+                            print(event)
 
 
 class WatsonxAdaptor(ChatAdaptor):

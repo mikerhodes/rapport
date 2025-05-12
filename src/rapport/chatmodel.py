@@ -51,7 +51,8 @@ class IncludedImage(BaseModel):
 
 
 class ToolCallMessage(BaseModel):
-    tool: str
+    id: str
+    name: str
     parameters: Dict[str, Any]
     role: Literal["assistant"] = "assistant"
     type: Literal["ToolCallMessage"] = "ToolCallMessage"
