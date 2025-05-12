@@ -488,7 +488,9 @@ def render_sidebar():
 
 def render_chat_messages():
     # Display chat messages from history on app rerun
-    for message in _s.chat.messages:
+    i = 0
+    while i < len(_s.chat.messages):
+        message = _s.chat.messages[i]
         # Use the type discriminator field to determine the message type
         match message.type:
             case "SystemMessage":
@@ -514,22 +516,26 @@ def render_chat_messages():
                     else:
                         st.warning("Change model to use images.")
             case "ToolCallMessage":
-                with st.chat_message(
-                    message.role, avatar=":material/build:"
-                ):
-                    st.markdown(f"**Tool Call: {message.name}**")
-                    with st.expander("Tool Parameters"):
-                        st.json(message.parameters)
-            case "ToolResultMessage":
-                with st.chat_message(
-                    message.role, avatar=":material/done_all:"
-                ):
-                    st.markdown(f"**Tool Result: {message.name}**")
-                    with st.expander("Tool Results"):
-                        st.code(message.result)
+                # peek ahead and render the result too if we have it
+                result = _s.chat.messages[i + 1]
+                if result.type == "ToolResultMessage":
+                    render_tool_call(message, result)
+                    i += 1
+                else:
+                    render_tool_call(message, None)
             case "AssistantMessage" | "UserMessage":
                 with st.chat_message(message.role):
                     st.markdown(message.message)
+        i += 1
+
+
+def render_tool_call(tool_call, tool_response):
+    with st.expander(f"**Tool Call: {tool_call.name}**"):
+        st.caption("Parameters")
+        st.code(tool_call.parameters)
+        if tool_response is not None:
+            st.caption("Result")
+            st.code(tool_response.result)
 
 
 def generate_assistant_message():
@@ -549,48 +555,63 @@ def generate_assistant_message():
             else:
                 st.error("Bad chat return type; not added to chat.")
 
-            for tool_call in _s.outstanding_tool_calls:
-                from rapport import tools
-
-                try:
-                    result = ToolResultMessage(
-                        id=tool_call.id,
-                        name=tool_call.name,
-                        result=tools.execute_tool(
-                            tool_call.name, tool_call.parameters
-                        ),
-                    )
-                    _s.chat.messages.extend([tool_call, result])
-                except ValueError as ex:
-                    logger.error("Error running tool:", ex)
-                _s.outstanding_tool_calls.clear()
-
-                # TODO, the issue here is that we need to send the tool
-                # use _back_ to the model at this point. This suggests
-                # a significantly more difficult set of changes as we
-                # have to alter significantly how we're rendering chats,
-                # to be able to handle a single user prompt having several
-                # responses in from the model --- eg, text, tool call, text.
-                # We need to show the text, then have generate chat response
-                # realise that it needs to show the tool calls, then loop
-                # around again _as if it has a new prompt_.
-
-            # send the tool use back and get another answer
-            with st.spinner("Thinking...", show_time=False):
-                g = wait_n_and_chain(2, stream_model_response())
-            m = st.write_stream(g)
-            # st.write(message)
-            if isinstance(m, str):  # should always be
-                _s.chat.messages.append(AssistantMessage(message=m))
-            else:
-                st.error("Bad chat return type; not added to chat.")
-
-            save_current_chat()
         except Exception as e:
             print(e)
             print(traceback.format_exc())
             print("The server could not be reached")
             st.error(e)
+
+    tool_use = len(_s.outstanding_tool_calls) > 0
+
+    for tool_call in _s.outstanding_tool_calls:
+        from rapport import tools
+
+        try:
+            result = ToolResultMessage(
+                id=tool_call.id,
+                name=tool_call.name,
+                result=tools.execute_tool(
+                    tool_call.name, tool_call.parameters
+                ),
+            )
+            _s.chat.messages.extend([tool_call, result])
+            render_tool_call(tool_call, result)
+        except ValueError as ex:
+            logger.error("Error running tool:", ex)
+
+    _s.outstanding_tool_calls.clear()
+
+    # TODO, the issue here is that we need to send the tool
+    # use _back_ to the model at this point. This suggests
+    # a significantly more difficult set of changes as we
+    # have to alter significantly how we're rendering chats,
+    # to be able to handle a single user prompt having several
+    # responses in from the model --- eg, text, tool call, text.
+    # We need to show the text, then have generate chat response
+    # realise that it needs to show the tool calls, then loop
+    # around again _as if it has a new prompt_.
+
+    if tool_use:
+        with st.chat_message("assistant"), st.empty():
+            try:
+                # send the tool use back and get another answer
+                # TODO Strictly we should be going back to the top
+                # in case this call prompts another tool use...
+                with st.spinner("Thinking...", show_time=False):
+                    g = wait_n_and_chain(2, stream_model_response())
+                m = st.write_stream(g)
+                # st.write(message)
+                if isinstance(m, str):  # should always be
+                    _s.chat.messages.append(AssistantMessage(message=m))
+                else:
+                    st.error("Bad chat return type; not added to chat.")
+            except Exception as e:
+                print(e)
+                print(traceback.format_exc())
+                print("The server could not be reached")
+                st.error(e)
+
+    save_current_chat()
 
 
 def render_assistant_message_footer():
