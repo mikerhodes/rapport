@@ -27,6 +27,8 @@ from anthropic.types import (
     MessageParam,
     PlainTextSourceParam,
     TextBlockParam,
+    ToolResultBlockParam,
+    ToolUseBlockParam,
 )
 from ibm_watsonx_ai.wml_client_error import WMLClientError
 from openai.types.chat import (
@@ -458,12 +460,22 @@ class AnthropicAdaptor(ChatAdaptor):
                 case "UserMessage":
                     mp = MessageParam(
                         role="user",
-                        content=m.message,
+                        content=[
+                            TextBlockParam(
+                                type="text",
+                                text=m.message,
+                            )
+                        ],
                     )
                 case "AssistantMessage":
                     mp = MessageParam(
                         role="assistant",
-                        content=m.message,
+                        content=[
+                            TextBlockParam(
+                                type="text",
+                                text=m.message,
+                            )
+                        ],
                     )
                 case "IncludedFile":
                     p = self._prepare_documentblockparam(m.data)
@@ -477,6 +489,29 @@ class AnthropicAdaptor(ChatAdaptor):
                         role="user",
                         content=[p],
                     )
+                case "ToolCallMessage":
+                    mp = MessageParam(
+                        role="assistant",
+                        content=[
+                            ToolUseBlockParam(
+                                type="tool_use",
+                                id=m.id,
+                                input=m.parameters,
+                                name=m.name,
+                            )
+                        ],
+                    )
+                case "ToolResultMessage":
+                    mp = MessageParam(
+                        role="user",
+                        content=[
+                            ToolResultBlockParam(
+                                tool_use_id=m.id,
+                                type="tool_result",
+                                content=m.result,
+                            )
+                        ],
+                    )
                 case _:
                     pass
             if mp:
@@ -484,20 +519,12 @@ class AnthropicAdaptor(ChatAdaptor):
 
         # If last message is user, apply prompt caching
         match output[-1]:
-            case {"role": "user", "content": c}:
+            case {"role": "user", "content": [c]}:
                 print("applying prompt caching")
-                output[-1] = MessageParam(
-                    role="user",
-                    content=[
-                        TextBlockParam(
-                            type="text",
-                            text=c,
-                            cache_control=CacheControlEphemeralParam(
-                                type="ephemeral"
-                            ),
-                        )
-                    ],
+                c["cache_control"] = CacheControlEphemeralParam(
+                    type="ephemeral"
                 )
+                output[-1] = MessageParam(role="user", content=[c])
 
         return (system_prompt, output)
 

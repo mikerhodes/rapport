@@ -41,6 +41,7 @@ class State:
     finish_reason: FinishReason
     config_store: ConfigStore
     load_chat_with_id: Optional[str]
+    outstanding_tool_calls: List[ToolCallMessage]
 
 
 # _s acts as a typed accessor for session state.
@@ -79,22 +80,7 @@ def stream_model_response():
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
         if chunk.tool_call is not None:
-            _s.chat.messages.append(chunk.tool_call)
-            from rapport import tools
-
-            try:
-                result = tools.execute_tool(
-                    chunk.tool_call.name, chunk.tool_call.parameters
-                )
-                _s.chat.messages.append(
-                    ToolResultMessage(
-                        id=chunk.tool_call.id,
-                        name=chunk.tool_call.name,
-                        result=result,
-                    )
-                )
-            except ValueError as ex:
-                logger.error("Error running tool:", ex)
+            _s.outstanding_tool_calls.append(chunk.tool_call)
 
         # print(chunk.content)
         chunkier_chunk += chunk.content
@@ -388,6 +374,8 @@ def init_state():
     # Don't generate a chat message until the user has prompted
     if "generate_assistant" not in st.session_state:
         _s.generate_assistant = False
+    if "outstanding_tool_calls" not in st.session_state:
+        _s.outstanding_tool_calls = []
 
     _s.models = _s.chat_gateway.list()
     if not _s.models:
@@ -560,6 +548,43 @@ def generate_assistant_message():
                 _s.chat.messages.append(AssistantMessage(message=m))
             else:
                 st.error("Bad chat return type; not added to chat.")
+
+            for tool_call in _s.outstanding_tool_calls:
+                from rapport import tools
+
+                try:
+                    result = ToolResultMessage(
+                        id=tool_call.id,
+                        name=tool_call.name,
+                        result=tools.execute_tool(
+                            tool_call.name, tool_call.parameters
+                        ),
+                    )
+                    _s.chat.messages.extend([tool_call, result])
+                except ValueError as ex:
+                    logger.error("Error running tool:", ex)
+                _s.outstanding_tool_calls.clear()
+
+                # TODO, the issue here is that we need to send the tool
+                # use _back_ to the model at this point. This suggests
+                # a significantly more difficult set of changes as we
+                # have to alter significantly how we're rendering chats,
+                # to be able to handle a single user prompt having several
+                # responses in from the model --- eg, text, tool call, text.
+                # We need to show the text, then have generate chat response
+                # realise that it needs to show the tool calls, then loop
+                # around again _as if it has a new prompt_.
+
+            # send the tool use back and get another answer
+            with st.spinner("Thinking...", show_time=False):
+                g = wait_n_and_chain(2, stream_model_response())
+            m = st.write_stream(g)
+            # st.write(message)
+            if isinstance(m, str):  # should always be
+                _s.chat.messages.append(AssistantMessage(message=m))
+            else:
+                st.error("Bad chat return type; not added to chat.")
+
             save_current_chat()
         except Exception as e:
             print(e)
