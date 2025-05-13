@@ -541,22 +541,25 @@ def render_tool_call(tool_call, tool_response):
 
 
 def generate_assistant_message():
-    turns = 0  # limit turns for safety
-    while True and turns < 20:
-        turns += 1
+    with st.chat_message("assistant"):
+        turns = 0  # limit turns for safety
+        while True and turns < 20:
+            turns += 1
 
-        # Using the .empty() container ensures that once the
-        # model starts returning content, we replace the spinner
-        # with the streamed content. We then also need to write
-        # out the full message at the end (for some reason
-        # the message otherwise disappears).
-        with st.chat_message("assistant"), st.empty():
+            # Using the .empty() container ensures that once the
+            # model starts returning content, we replace the spinner
+            # with the streamed content. We then also need to write
+            # out the full message at the end (for some reason
+            # the message otherwise disappears).
             try:
                 with st.spinner("Thinking...", show_time=False):
                     g = wait_n_and_chain(2, stream_model_response())
                 m = st.write_stream(g)
                 # st.write(message)
-                if isinstance(m, str):  # should always be
+
+                # should be str, might be empty if model immediately
+                # does a tool call.
+                if isinstance(m, str) and m:
                     _s.chat.messages.append(AssistantMessage(message=m))
                 else:
                     st.error("Bad chat return type; not added to chat.")
@@ -567,38 +570,38 @@ def generate_assistant_message():
                 print("The server could not be reached")
                 st.error(e)
 
-        tool_use = len(_s.outstanding_tool_calls) > 0
+            tool_use = len(_s.outstanding_tool_calls) > 0
 
-        for tool_call in _s.outstanding_tool_calls:
-            from rapport import tools
+            for tool_call in _s.outstanding_tool_calls:
+                from rapport import tools
 
-            try:
-                result = ToolResultMessage(
-                    id=tool_call.id,
-                    name=tool_call.name,
-                    result=tools.execute_tool(
-                        tool_call.name, tool_call.parameters
-                    ),
-                )
-                _s.chat.messages.extend([tool_call, result])
-                render_tool_call(tool_call, result)
-            except ValueError as ex:
-                logger.error("Error running tool:", ex)
+                try:
+                    result = ToolResultMessage(
+                        id=tool_call.id,
+                        name=tool_call.name,
+                        result=tools.execute_tool(
+                            tool_call.name, tool_call.parameters
+                        ),
+                    )
+                    _s.chat.messages.extend([tool_call, result])
+                    render_tool_call(tool_call, result)
+                except ValueError as ex:
+                    logger.error("Error running tool:", ex)
 
-        _s.outstanding_tool_calls.clear()
+            _s.outstanding_tool_calls.clear()
 
-        # It would be nice to draw the tool call inside
-        # the assistant chat message, but if we do that
-        # here, we also have to rewrite the message history
-        # rendering to do the same.
+            # It would be nice to draw the tool call inside
+            # the assistant chat message, but if we do that
+            # here, we also have to rewrite the message history
+            # rendering to do the same.
 
-        save_current_chat()
+            save_current_chat()
 
-        # If we have tool use, go around again
-        if tool_use:
-            continue
-        else:
-            break
+            # If we have tool use, go around again
+            if tool_use:
+                continue
+            else:
+                break
 
 
 def render_assistant_message_footer():

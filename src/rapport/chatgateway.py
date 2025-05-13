@@ -467,7 +467,7 @@ class AnthropicAdaptor(ChatAdaptor):
                             )
                         ],
                     )
-                case "AssistantMessage":
+                case "AssistantMessage" if m.message:
                     mp = MessageParam(
                         role="assistant",
                         content=[
@@ -597,15 +597,25 @@ class AnthropicAdaptor(ChatAdaptor):
 
         tools = [x.render_anthropic() for x in tools.get_enabled_tools([])]
 
-        chunk_stream = self.c.messages.create(
-            max_tokens=8192,
-            messages=anth_messages,
-            model=model,
-            stream=True,
-            system=system_prompt,
-            tools=tools,
-        )
-        input_tokens = 0
+        chunk_stream = None
+        try:
+            chunk_stream = self.c.messages.create(
+                max_tokens=8192,
+                messages=anth_messages,
+                model=model,
+                stream=True,
+                system=system_prompt,
+                tools=tools,
+            )
+            input_tokens = 0
+        except Exception as ex:
+            print(messages)
+            print("=" * 20)
+            print(anth_messages)
+            print(ex)
+
+        if chunk_stream is None:
+            return
 
         from enum import Enum
         import json
