@@ -12,7 +12,7 @@ import streamlit as st
 from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
 
-from rapport import consts
+from rapport import consts, tools
 from rapport.appconfig import ConfigStore
 from rapport.chatgateway import ChatGateway, FinishReason
 from rapport.chathistory import ChatHistoryManager
@@ -526,6 +526,8 @@ def render_chat_messages():
                 # Render tool calls inline if we find them following this
                 # message. We peek the iterator in the while loop, advancing
                 # it if we find tool calls to render.
+                # This displays tool calls nicely inline with the model text
+                # referencing them.
                 with st.chat_message(message.role):
                     m = message
                     while True:
@@ -535,7 +537,7 @@ def render_chat_messages():
                             case "ToolCallMessage":
                                 render_tool_call(m, next(p))
                         # If no more items in iterable, or it's
-                        # not an assistant type message, break
+                        # not an assistant-type message, break
                         if not p:
                             break
                         match p.peek().type:
@@ -558,20 +560,16 @@ def render_tool_call(tool_call, tool_response):
 
 def generate_assistant_message():
     with st.chat_message("assistant"):
-        turns = 0  # limit turns for safety
-        while True and turns < 20:
-            turns += 1
+        turns = 20  # limit tool-calling turns for safety
+        while turns:
+            turns -= 1
 
-            # Using the .empty() container ensures that once the
-            # model starts returning content, we replace the spinner
-            # with the streamed content. We then also need to write
-            # out the full message at the end (for some reason
-            # the message otherwise disappears).
             try:
+                # stream_model_response accumulates tool calls
+                # in _s.outstanding_tool_calls
                 with st.spinner("Thinking...", show_time=False):
                     g = wait_n_and_chain(2, stream_model_response())
                 m = st.write_stream(g)
-                # st.write(message)
 
                 # should be str, might be empty if model immediately
                 # does a tool call.
@@ -590,8 +588,6 @@ def generate_assistant_message():
             tool_use = len(_s.outstanding_tool_calls) > 0
 
             for tool_call in _s.outstanding_tool_calls:
-                from rapport import tools
-
                 try:
                     result = ToolResultMessage(
                         id=tool_call.id,
@@ -606,11 +602,6 @@ def generate_assistant_message():
                     logger.error("Error running tool:", ex)
 
             _s.outstanding_tool_calls.clear()
-
-            # It would be nice to draw the tool call inside
-            # the assistant chat message, but if we do that
-            # here, we also have to rewrite the message history
-            # rendering to do the same.
 
             save_current_chat()
 
