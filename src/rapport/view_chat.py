@@ -1,19 +1,21 @@
-from io import StringIO
 import json
 import logging
-import traceback
-from pathlib import Path
 import shutil
 import subprocess
-from typing import Iterable, List, cast, Optional
+import traceback
+from io import StringIO
+from pathlib import Path
+from typing import Iterable, List, Optional, cast
 
-from pandas.core.frame import itertools
+import more_itertools
 import streamlit as st
+from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
 
 from rapport import consts
 from rapport.appconfig import ConfigStore
 from rapport.chatgateway import ChatGateway, FinishReason
+from rapport.chathistory import ChatHistoryManager
 from rapport.chatmodel import (
     PAGE_HISTORY,
     AssistantMessage,
@@ -25,7 +27,6 @@ from rapport.chatmodel import (
     UserMessage,
     new_chat,
 )
-from rapport.chathistory import ChatHistoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -487,10 +488,8 @@ def render_sidebar():
 
 
 def render_chat_messages():
-    # Display chat messages from history on app rerun
-    i = 0
-    while i < len(_s.chat.messages):
-        message = _s.chat.messages[i]
+    p = more_itertools.peekable(_s.chat.messages)
+    for message in p:
         # Use the type discriminator field to determine the message type
         match message.type:
             case "SystemMessage":
@@ -516,19 +515,36 @@ def render_chat_messages():
                     else:
                         st.warning("Change model to use images.")
             case "ToolCallMessage":
-                # peek ahead and render the result too if we have it
-                result = _s.chat.messages[i + 1]
-                if result.type == "ToolResultMessage":
-                    render_tool_call(message, result)
-                    i += 1
-                else:
-                    logger.error(
-                        "Didn't have a tool result for tool call:", message
-                    )
-            case "AssistantMessage" | "UserMessage":
+                logger.error(
+                    "Only expect tool calls following AssistantMessage:",
+                    message,
+                )
+            case "UserMessage":
                 with st.chat_message(message.role):
                     st.markdown(message.message)
-        i += 1
+            case "AssistantMessage":
+                # Render tool calls inline if we find them following this
+                # message. We peek the iterator in the while loop, advancing
+                # it if we find tool calls to render.
+                with st.chat_message(message.role):
+                    m = message
+                    while True:
+                        match m.type:
+                            case "AssistantMessage":
+                                st.markdown(m.message)
+                            case "ToolCallMessage":
+                                render_tool_call(m, next(p))
+                        # If no more items in iterable, or it's
+                        # not an assistant type message, break
+                        if not p:
+                            break
+                        match p.peek().type:
+                            # We are still in the assistant's turn
+                            case "AssistantMessage" | "ToolCallMessage":
+                                m = next(p)
+                                continue
+                            case _:
+                                break
 
 
 def render_tool_call(tool_call, tool_response):
@@ -559,10 +575,11 @@ def generate_assistant_message():
 
                 # should be str, might be empty if model immediately
                 # does a tool call.
-                if isinstance(m, str) and m:
-                    _s.chat.messages.append(AssistantMessage(message=m))
+                if isinstance(m, str):
+                    if m:  # only add if model sent text content
+                        _s.chat.messages.append(AssistantMessage(message=m))
                 else:
-                    st.error("Bad chat return type; not added to chat.")
+                    logger.error("Bad chat return type; not added to chat.")
 
             except Exception as e:
                 print(e)

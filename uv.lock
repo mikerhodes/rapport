@@ -415,6 +415,15 @@ wheels = [
 ]
 
 [[package]]
+name = "more-itertools"
+version = "10.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/a0/834b0cebabbfc7e311f30b46c8188790a37f89fc8d756660346fe5abfd09/more_itertools-10.7.0.tar.gz", hash = "sha256:9fddd5403be01a94b204faadcff459ec3568cf110265d3c54323e1e866ad29d3", size = 127671 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/9f/7ba6f94fc1e9ac3d2b853fdff3035fb2fa5afbed898c4a72b8a020610594/more_itertools-10.7.0-py3-none-any.whl", hash = "sha256:d43980384673cb07d2f7d2d918c616b30c659c089ee23953f601d6609c67510e", size = 65278 },
+]
+
+[[package]]
 name = "narwhals"
 version = "1.37.1"
 source = { registry = "https://pypi.org/simple" }
@@ -724,6 +733,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "ibm-watsonx-ai" },
+    { name = "more-itertools" },
     { name = "ollama" },
     { name = "openai" },
     { name = "pydantic" },
@@ -735,6 +745,7 @@ dependencies = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.46.0" },
     { name = "ibm-watsonx-ai", specifier = ">=1.2.9" },
+    { name = "more-itertools", specifier = ">=10.7.0" },
     { name = "ollama", specifier = ">=0.4.7" },
     { name = "openai", specifier = ">=1.74.0" },
     { name = "pydantic", specifier = ">=2.6.0" },
