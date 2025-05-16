@@ -9,6 +9,7 @@ from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 from rapport.appconfig import ConfigStore
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 st.set_page_config(
     page_title="Rapport",

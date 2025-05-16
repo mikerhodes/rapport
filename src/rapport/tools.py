@@ -126,7 +126,7 @@ def get_enabled_tools(config: ConfigStore) -> List[Tool]:
     ts: List[Tool] = []
     for _, tool in _iterate_enabled_tools(config=config):
         ts.append(tool)
-    logger.debug("enabled_tools %s", ts)
+    logger.debug("enabled_tools %s", [x.name for x in ts])
     return ts
 
 
