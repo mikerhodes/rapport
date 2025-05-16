@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Dict, List, Callable, Any, Optional
+import threading
+from typing import Dict, List, Any, Optional
 
 from anthropic.types import ToolUnionParam
 
@@ -13,9 +14,16 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+_client_cache: Dict[str, Any] = {}
+_client_cache_lock = threading.Lock()
+
 
 async def list_tools(mcp_url: str):
-    client = Client(mcp_url)
+    with _client_cache_lock:
+        if mcp_url not in _client_cache:
+            logger.debug("Creating Client for %s", mcp_url)
+            _client_cache[mcp_url] = Client(mcp_url)
+        client = _client_cache[mcp_url]
 
     # Connection is established here
     async with client:
@@ -28,7 +36,11 @@ async def list_tools(mcp_url: str):
 
 
 async def run_tool(mcp_url: str, name: str, params: Dict[str, Any]):
-    client = Client(mcp_url)
+    with _client_cache_lock:
+        if mcp_url not in _client_cache:
+            logger.debug("Creating Client for %s", mcp_url)
+            _client_cache[mcp_url] = Client(mcp_url)
+        client = _client_cache[mcp_url]
     result = None
 
     async with client:
@@ -69,33 +81,6 @@ class Tool:
         }
 
 
-def add(a: int, b: int) -> int:
-    """Add two integers and return their sum."""
-    return a + b
-
-
-# Define tools with metadata
-# Perhaps we'd want some "standard" tools here, eg search duckduckgo or read url
-AVAILABLE_TOOLS = {
-    "add": Tool(
-        name="add",
-        description="Add two integers together",
-        function_name="add",
-        parameters={
-            "type": "object",
-            "properties": {
-                "a": {"type": "integer", "description": "First number"},
-                "b": {"type": "integer", "description": "Second number"},
-            },
-            "required": ["a", "b"],
-        },
-    )
-}
-
-# Map function names to actual functions
-TOOL_FUNCTIONS: Dict[str, Callable] = {"add": add}
-
-
 def get_available_tools(mcp_url: str) -> List[Tool]:
     """Return all available tools"""
     tools = asyncio.run(list_tools(mcp_url))
@@ -108,56 +93,13 @@ def get_available_tools(mcp_url: str) -> List[Tool]:
         )
         for x in tools
     ]
-    # return list(AVAILABLE_TOOLS.values())
 
 
-def get_enabled_tools(config: ConfigStore) -> List[Tool]:
-    """Return only enabled tools based on their names"""
-    mcp_servers = config.load_config().mcp_servers.splitlines()
-    enabled_tools: List[Tool] = []
-    seen_tools = set()  # no dup tool names
-    for s in mcp_servers:
-        logger.debug("Processing MCP server: %s", s)
-        url, ts = s.split(" ", 1)
-        logger.debug("Extracted URL: %s", url)
-
-        # Don't enable any tools if there are duplicate names
-        available_tools = get_available_tools(url)
-        for n in [x.name for x in available_tools]:
-            if n in seen_tools:
-                logger.error("Duplicate tool name, disabling tools: %s", n)
-                raise ValueError(
-                    "Duplicate tool name, disabling tools: " + n
-                )
-            seen_tools.add(n)
-
-        allowed_tools = [x.strip() for x in ts.split(",")]
-        logger.debug("%s allowed_tools %s", url, allowed_tools)
-        if allowed_tools:
-            if available_tools:
-                enabled_tools.extend(
-                    x for x in available_tools if x.name in allowed_tools
-                )
-        logger.debug(
-            "Updated enabled_tools: %s", [x.name for x in enabled_tools]
-        )
-    # all tools until we write config
-    # perhaps config can be like:
-    # server toolname,toolname
-    # http://localhost:1234/mcp add,mul
-    # if the servers are up, they are available, filter on tool names
-    logger.debug("Final enabled_tools: %s", [x.name for x in enabled_tools])
-    return enabled_tools
-
-
-def _url_for_tool(config: ConfigStore, name: str) -> Optional[str]:
-    url = None
-
+def _iterate_enabled_tools(config: ConfigStore):
     mcp_servers = config.load_config().mcp_servers.splitlines()
     seen_tools = set()  # no dup tool names
     # Find URL where tool is available and allowed
     for s in mcp_servers:
-        enabled_tools: List[Tool] = []
         logger.debug("Processing MCP server: %s", s)
         url, ts = s.split(" ", 1)
         logger.debug("Extracted URL: %s", url)
@@ -174,18 +116,25 @@ def _url_for_tool(config: ConfigStore, name: str) -> Optional[str]:
 
         allowed_tools = [x.strip() for x in ts.split(",")]
         logger.debug("%s allowed_tools %s", url, allowed_tools)
-        if allowed_tools:
-            if available_tools:
-                enabled_tools.extend(
-                    x for x in available_tools if x.name in allowed_tools
-                )
+        if allowed_tools and available_tools:
+            for x in [x for x in available_tools if x.name in allowed_tools]:
+                yield url, x
 
-        if name in [x.name for x in enabled_tools]:
+
+def get_enabled_tools(config: ConfigStore) -> List[Tool]:
+    """Return only enabled tools based on their names"""
+    ts: List[Tool] = []
+    for _, tool in _iterate_enabled_tools(config=config):
+        ts.append(tool)
+    logger.debug("enabled_tools %s", ts)
+    return ts
+
+
+def _url_for_tool(config: ConfigStore, name: str) -> Optional[str]:
+    for url, tool in _iterate_enabled_tools(config=config):
+        if name == tool.name:
             return url
-        logger.debug(
-            "Updated enabled_tools: %s", [x.name for x in enabled_tools]
-        )
-    return url
+    return None
 
 
 def execute_tool(
