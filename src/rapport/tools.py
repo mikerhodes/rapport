@@ -1,34 +1,38 @@
 from dataclasses import dataclass
-from typing import Dict, List, Callable, Any
+from typing import Dict, List, Callable, Any, Optional
 
 from anthropic.types import ToolUnionParam
 
 import asyncio
 from fastmcp import Client
 
-client = Client("http://localhost:9000/mcp")
+from rapport.appconfig import ConfigStore
+
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
-async def list_tools():
+async def list_tools(mcp_url: str):
+    client = Client(mcp_url)
+
     # Connection is established here
     async with client:
-        print(f"Client connected: {client.is_connected()}")
+        logger.debug(f"Client connected: {client.is_connected()}")
 
         # Make MCP calls within the context
         tools = await client.list_tools()
 
-        if any(tool.name == "add" for tool in tools):
-            result = await client.call_tool("add", {"a": 123, "b": 456})
-            print(f"Add result: {result}")
-
     return tools
 
 
-async def run_tool(name: str, params: Dict[str, Any]):
+async def run_tool(mcp_url: str, name: str, params: Dict[str, Any]):
+    client = Client(mcp_url)
     result = None
 
     async with client:
-        print(f"Client connected: {client.is_connected()}")
+        logger.debug(f"Client connected: {client.is_connected()}")
 
         # Make MCP calls within the context
         tools = await client.list_tools()
@@ -92,9 +96,9 @@ AVAILABLE_TOOLS = {
 TOOL_FUNCTIONS: Dict[str, Callable] = {"add": add}
 
 
-def get_available_tools() -> List[Tool]:
+def get_available_tools(mcp_url: str) -> List[Tool]:
     """Return all available tools"""
-    tools = asyncio.run(list_tools())
+    tools = asyncio.run(list_tools(mcp_url))
     return [
         Tool(
             name=x.name,
@@ -107,26 +111,91 @@ def get_available_tools() -> List[Tool]:
     # return list(AVAILABLE_TOOLS.values())
 
 
-def get_enabled_tools(enabled_tool_names: List[str]) -> List[Tool]:
+def get_enabled_tools(config: ConfigStore) -> List[Tool]:
     """Return only enabled tools based on their names"""
+    mcp_servers = config.load_config().mcp_servers.splitlines()
+    enabled_tools: List[Tool] = []
+    seen_tools = set()  # no dup tool names
+    for s in mcp_servers:
+        logger.debug("Processing MCP server: %s", s)
+        url, ts = s.split(" ", 1)
+        logger.debug("Extracted URL: %s", url)
+
+        # Don't enable any tools if there are duplicate names
+        available_tools = get_available_tools(url)
+        for n in [x.name for x in available_tools]:
+            if n in seen_tools:
+                logger.error("Duplicate tool name, disabling tools: %s", n)
+                raise ValueError(
+                    "Duplicate tool name, disabling tools: " + n
+                )
+            seen_tools.add(n)
+
+        allowed_tools = [x.strip() for x in ts.split(",")]
+        logger.debug("%s allowed_tools %s", url, allowed_tools)
+        if allowed_tools:
+            if available_tools:
+                enabled_tools.extend(
+                    x for x in available_tools if x.name in allowed_tools
+                )
+        logger.debug(
+            "Updated enabled_tools: %s", [x.name for x in enabled_tools]
+        )
     # all tools until we write config
     # perhaps config can be like:
     # server toolname,toolname
     # http://localhost:1234/mcp add,mul
     # if the servers are up, they are available, filter on tool names
-    return [t for t in get_available_tools()]
-    # return [t for t in get_available_tools() if t.name in enabled_tool_names]
+    logger.debug("Final enabled_tools: %s", [x.name for x in enabled_tools])
+    return enabled_tools
 
 
-def execute_tool(tool_name: str, params: Dict[str, Any]) -> str:
+def _url_for_tool(config: ConfigStore, name: str) -> Optional[str]:
+    url = None
+
+    mcp_servers = config.load_config().mcp_servers.splitlines()
+    seen_tools = set()  # no dup tool names
+    # Find URL where tool is available and allowed
+    for s in mcp_servers:
+        enabled_tools: List[Tool] = []
+        logger.debug("Processing MCP server: %s", s)
+        url, ts = s.split(" ", 1)
+        logger.debug("Extracted URL: %s", url)
+
+        # Don't enable any tools if there are duplicate names
+        available_tools = get_available_tools(url)
+        for n in [x.name for x in available_tools]:
+            if n in seen_tools:
+                logger.error("Duplicate tool name, disabling tools: %s", n)
+                raise ValueError(
+                    "Duplicate tool name, disabling tools: " + n
+                )
+            seen_tools.add(n)
+
+        allowed_tools = [x.strip() for x in ts.split(",")]
+        logger.debug("%s allowed_tools %s", url, allowed_tools)
+        if allowed_tools:
+            if available_tools:
+                enabled_tools.extend(
+                    x for x in available_tools if x.name in allowed_tools
+                )
+
+        if name in [x.name for x in enabled_tools]:
+            return url
+        logger.debug(
+            "Updated enabled_tools: %s", [x.name for x in enabled_tools]
+        )
+    return url
+
+
+def execute_tool(
+    config: ConfigStore, tool_name: str, params: Dict[str, Any]
+) -> str:
     """Execute a tool with the given parameters"""
-    if tool_name not in [x.name for x in get_enabled_tools([])]:
+    mcp_url = _url_for_tool(config, tool_name)
+    if mcp_url is None:
         raise ValueError(f"Unknown tool: {tool_name}")
 
     # validate correct params?
-
-    # func = TOOL_FUNCTIONS[tool_name]
-    # return str(func(**params))
-
-    result = asyncio.run(run_tool(tool_name, params))
+    result = asyncio.run(run_tool(mcp_url, tool_name, params))
     return result or ""

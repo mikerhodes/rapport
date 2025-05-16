@@ -67,6 +67,7 @@ def stream_model_response():
     response = _s.chat_gateway.chat(
         model=_s.chat.model,
         messages=_s.chat.messages,
+        tools=tools.get_enabled_tools(_s.config_store),
     )
 
     # chunkier chunks so we don't force redraw too often, and we can
@@ -593,7 +594,9 @@ def generate_assistant_message():
                         id=tool_call.id,
                         name=tool_call.name,
                         result=tools.execute_tool(
-                            tool_call.name, tool_call.parameters
+                            _s.config_store,
+                            tool_call.name,
+                            tool_call.parameters,
                         ),
                     )
                     _s.chat.messages.extend([tool_call, result])
@@ -655,6 +658,7 @@ def render_chat_input():
 def main():
     try:
         init_state()
+        tools.get_enabled_tools(_s.config_store)
         render_sidebar()
         render_chat_messages()
         if _s.generate_assistant:

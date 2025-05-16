@@ -6,7 +6,7 @@ from rapport.appconfig import Config, ConfigStore
 st.title("Settings")
 
 # Get config store from session state
-config_store = st.session_state["config_store"]
+config_store: ConfigStore = st.session_state["config_store"]
 config = config_store.load_config()
 
 # Create form for editing settings
@@ -31,6 +31,15 @@ with st.form("settings_form"):
         help="Feel free to phrase this using 'I', such as 'I like cats'",
     )
 
+    st.subheader("MCP Servers")
+    st.caption("One per line, with a URL followed by enabled tools")
+    mcp_servers = st.text_area(
+        "Format `http://localhost:9000 toolname,toolname`",
+        value=config.mcp_servers or "",
+        placeholder="http://localhost:9000 add,multiple,divide",
+        height=150,
+    )
+
     st.subheader("Obsidian integration")
 
     obsidian_directory = st.text_input(
@@ -53,6 +62,7 @@ with st.form("settings_form"):
             custom_system_prompt=custom_system_prompt
             if custom_system_prompt
             else None,
+            mcp_servers=mcp_servers,
         )
 
         # Save to disk

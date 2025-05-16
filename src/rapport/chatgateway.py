@@ -49,6 +49,7 @@ from rapport.chatmodel import (
     ToolResultMessage,
     UserMessage,
 )
+from rapport.tools import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ class ChatAdaptor(Protocol):
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]: ...
 
 
@@ -156,11 +158,13 @@ class ChatGateway:
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]:
         c = self.model_to_client[model]
         response = c.chat(
             model=model,
             messages=messages,
+            tools=tools,
         )
         for chunk in response:
             yield chunk
@@ -237,6 +241,7 @@ class OllamaAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]:
         messages_content = _prepare_messages_for_model(messages)
         m = self._show(model)
@@ -303,6 +308,7 @@ class OpenAIAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]:
         # cast until we make an openai specific message prep function
         messages_content = self._prepare_messages_for_model(messages)
@@ -588,14 +594,13 @@ class AnthropicAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]:
         system_prompt, anth_messages = self._prepare_messages_for_model(
             messages
         )
 
-        from rapport import tools
-
-        tools = [x.render_anthropic() for x in tools.get_enabled_tools([])]
+        anth_tools = [x.render_anthropic() for x in tools]
 
         chunk_stream = None
         try:
@@ -605,7 +610,7 @@ class AnthropicAdaptor(ChatAdaptor):
                 model=model,
                 stream=True,
                 system=system_prompt,
-                tools=tools,
+                tools=anth_tools,
             )
             input_tokens = 0
         except Exception as ex:
@@ -795,6 +800,7 @@ class WatsonxAdaptor(ChatAdaptor):
         self,
         model: str,
         messages: MessageList,
+        tools: List[Tool],
     ) -> Generator[MessageChunk, None, None]:
         messages_content = _prepare_messages_for_model(messages)
         fmodel = self._model_inference(model)

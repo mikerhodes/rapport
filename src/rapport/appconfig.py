@@ -10,6 +10,7 @@ class Config:
     obsidian_directory: Optional[str] = field(default=None)
     last_used_model: Optional[str] = field(default=None)
     custom_system_prompt: Optional[str] = field(default=None)
+    mcp_servers: str = field(default="")
 
 
 class ConfigStore:
