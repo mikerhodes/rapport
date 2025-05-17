@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, Iterator, List, Optional, cast
 
 import more_itertools
+from pandas.core.base import textwrap
 import streamlit as st
 from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
@@ -326,41 +327,41 @@ def _chat_as_markdown() -> str:
     lines.append(f"# {generate_chat_title(chat)}\n")
     for m in chat.messages:
         lines.append(f"**{m.role}**\n")
-        if isinstance(m, IncludedFile):
+        if m.type == "IncludedFile":
             lines.append(
-                f"""
-File `{m.name}` included in conversation:
+                textwrap.dedent(f"""
+                File `{m.name}` included in conversation:
 
-```{m.ext}
-{m.data}
-```
-                """
+                ```{m.ext}
+                {m.data}
+                ```
+                """)
             )
-        elif isinstance(m, IncludedImage):
+        elif m.type == "IncludedImage":
             lines.append(
-                f"""
-Image `{m.name}` included in conversation.
-                """
+                textwrap.dedent(f"""
+                Image `{m.name}` included in conversation.
+                """)
             )
         elif m.type == "ToolCallMessage":
             lines.append(
-                f"""
-Tool Call: `{m.name}`
+                textwrap.dedent(f"""
+                Tool Call: `{m.name}`
 
-```json
-{json.dumps(m.parameters, indent=2)}
-```
-                """
+                ```json
+                {json.dumps(m.parameters, indent=2)}
+                ```
+                """)
             )
         elif m.type == "ToolResultMessage":
             lines.append(
-                f"""
-Tool Result: `{m.name}`
+                textwrap.dedent(f"""
+                Tool Result: `{m.name}`
 
-```json
-{m.result}
-```
-                """
+                ```json
+                {m.result}
+                ```
+                """)
             )
         else:
             lines.append(m.message)
@@ -583,7 +584,7 @@ def _render_tool_call(tool_call, tool_response):
         st.code(tool_call.parameters)
         if tool_response is not None:
             st.caption("Result")
-            st.code(tool_response.result)
+            st.code(tool_response.result, height=400)
 
 
 def generate_assistant_message():
