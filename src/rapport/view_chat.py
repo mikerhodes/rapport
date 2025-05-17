@@ -5,7 +5,7 @@ import subprocess
 import traceback
 from io import StringIO
 from pathlib import Path
-from typing import Iterable, List, Optional, cast
+from typing import Iterable, Iterator, List, Optional, cast
 
 import more_itertools
 import streamlit as st
@@ -26,6 +26,7 @@ from rapport.chatmodel import (
     ToolResultMessage,
     UserMessage,
     new_chat,
+    Message,
 )
 
 logger = logging.getLogger(__name__)
@@ -496,6 +497,9 @@ def render_chat_messages():
             case "SystemMessage":
                 with st.expander("View system prompt"):
                     st.markdown(message.message)
+            case "UserMessage":
+                with st.chat_message(message.role):
+                    st.markdown(message.message)
             case "IncludedFile":
                 with st.chat_message(
                     message.role, avatar=":material/upload_file:"
@@ -515,39 +519,43 @@ def render_chat_messages():
                             st.image(str(message.path))
                     else:
                         st.warning("Change model to use images.")
-            case "ToolCallMessage":
-                logger.error(
-                    "Only expect tool calls following AssistantMessage:",
-                    message,
-                )
-            case "UserMessage":
-                with st.chat_message(message.role):
-                    st.markdown(message.message)
-            case "AssistantMessage":
-                # Render tool calls inline if we find them following this
-                # message. We peek the iterator in the while loop, advancing
-                # it if we find tool calls to render.
-                # This displays tool calls nicely inline with the model text
-                # referencing them.
-                with st.chat_message(message.role):
-                    m = message
-                    while True:
-                        match m.type:
-                            case "AssistantMessage":
-                                st.markdown(m.message)
-                            case "ToolCallMessage":
-                                render_tool_call(m, next(p))
-                        # If no more items in iterable, or it's
-                        # not an assistant-type message, break
-                        if not p:
-                            break
-                        match p.peek().type:
-                            # We are still in the assistant's turn
-                            case "AssistantMessage" | "ToolCallMessage":
-                                m = next(p)
-                                continue
-                            case _:
-                                break
+            case "AssistantMessage" | "ToolCallMessage":
+                _render_assistant_message_block(message, p)
+
+
+def _render_assistant_message_block(
+    first: AssistantMessage | ToolCallMessage,
+    p: more_itertools.peekable,
+):
+    """
+    Renders a group of AssistantMessage and tool call messages
+    into a single assistant chat block. Consumes the messages
+    from `p`.
+    """
+    # Render tool calls inline if we find them following this
+    # message. We peek the iterator in the while loop, advancing
+    # it if we find tool calls to render.
+    # This displays tool calls nicely inline with the model text
+    # referencing them.
+    m = first
+    with st.chat_message(first.role):
+        while True:
+            match m.type:
+                case "AssistantMessage":
+                    st.markdown(m.message)
+                case "ToolCallMessage":
+                    render_tool_call(m, next(p))
+            # If no more items in iterable, or it's
+            # not an assistant-type message, break
+            if not p:
+                break
+            match p.peek().type:
+                # We are still in the assistant's turn
+                case "AssistantMessage" | "ToolCallMessage":
+                    m = next(p)
+                    continue
+                case _:
+                    break
 
 
 def render_tool_call(tool_call, tool_response):
