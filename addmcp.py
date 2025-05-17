@@ -1,13 +1,38 @@
 # /// script
 # dependencies = [
 #   "fastmcp",
+#   "httpx",
+#   "markdownify"
 # ]
 # ///
 
 from fastmcp import FastMCP
+import httpx
+from markdownify import markdownify
 
 # Create MCP server instance
 server = FastMCP(name="addserver")
+
+
+@server.tool()
+def download_url(url: str) -> str:
+    """
+    Download a webpage and convert its content to markdown.
+
+    Args:
+        url: The URL to download
+
+    Returns:
+        Markdown content as a string
+    """
+    # Fetch the webpage content
+    response = httpx.get(url)
+    response.raise_for_status()  # Raise an error for bad responses
+
+    # Convert HTML to markdown
+    markdown_content = markdownify(response.text, heading_style="ATX")
+
+    return markdown_content
 
 
 # Define the "add" function handler
