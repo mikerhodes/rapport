@@ -6,6 +6,7 @@ from anthropic.types import ToolUnionParam
 
 import asyncio
 from fastmcp import Client
+import httpx
 
 from rapport.appconfig import ConfigStore
 
@@ -83,7 +84,12 @@ class Tool:
 
 def get_available_tools(mcp_url: str) -> List[Tool]:
     """Return all available tools"""
-    tools = asyncio.run(list_tools(mcp_url))
+    try:
+        tools = asyncio.run(list_tools(mcp_url))
+    except httpx.HTTPError as ex:
+        logger.warning("MCP server %s unreachable: %s", mcp_url, ex)
+        tools = []
+
     return [
         Tool(
             name=x.name,
