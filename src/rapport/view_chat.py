@@ -497,30 +497,49 @@ def render_chat_messages():
             case "SystemMessage":
                 with st.expander("View system prompt"):
                     st.markdown(message.message)
-            case "UserMessage":
-                with st.chat_message(message.role):
-                    st.markdown(message.message)
-            case "IncludedFile":
-                with st.chat_message(
-                    message.role, avatar=":material/upload_file:"
-                ):
-                    st.markdown(f"Included `{message.name}` in chat.")
-                    with st.expander("View file content"):
-                        st.markdown(f"```{message.ext}\n{message.data}\n```")
-            case "IncludedImage":
-                with st.chat_message(
-                    message.role, avatar=":material/image:"
-                ):
-                    st.markdown(f"Included image `{message.name}` in chat.")
+            case "UserMessage" | "IncludedFile" | "IncludedImage":
+                _render_user_message_block(message, p)
+            case "AssistantMessage" | "ToolCallMessage":
+                _render_assistant_message_block(message, p)
+
+
+def _render_user_message_block(
+    first: UserMessage | IncludedFile | IncludedImage,
+    p: more_itertools.peekable,
+):
+    """
+    Renders a group of UserMessage, IncludedFile and IncludeImage
+    messages into a single user chat block. Consumes the messages
+    from `p`.
+    """
+    m = first
+    with st.chat_message("user"):
+        while True:
+            match m.type:
+                case "UserMessage":
+                    st.markdown(m.message)
+                case "IncludedFile":
+                    with st.expander(f"Included `{m.name}` in chat."):
+                        st.markdown(f"```{m.ext}\n{m.data}\n```")
+                case "IncludedImage":
                     if _s.chat_gateway.supports_images(_s.model):
                         # make the image a bit smaller
                         a, _ = st.columns([1, 2])
                         with a:
-                            st.image(str(message.path))
+                            st.image(str(m.path))
                     else:
                         st.warning("Change model to use images.")
-            case "AssistantMessage" | "ToolCallMessage":
-                _render_assistant_message_block(message, p)
+            # If no more items in iterable, or it's
+            # not an assistant-type message, break
+            if not p:
+                break
+            match p.peek().type:
+                # We are still in the assistant's turn
+                case "UserMessage" | "IncludedFile" | "IncludedImage":
+                    m = next(p)
+                    continue
+                case _:
+                    break
 
 
 def _render_assistant_message_block(
@@ -538,13 +557,13 @@ def _render_assistant_message_block(
     # This displays tool calls nicely inline with the model text
     # referencing them.
     m = first
-    with st.chat_message(first.role):
+    with st.chat_message("assistant"):
         while True:
             match m.type:
                 case "AssistantMessage":
                     st.markdown(m.message)
                 case "ToolCallMessage":
-                    render_tool_call(m, next(p))
+                    _render_tool_call(m, next(p))
             # If no more items in iterable, or it's
             # not an assistant-type message, break
             if not p:
@@ -558,7 +577,7 @@ def _render_assistant_message_block(
                     break
 
 
-def render_tool_call(tool_call, tool_response):
+def _render_tool_call(tool_call, tool_response):
     with st.expander(f"**Tool Call: {tool_call.name}**"):
         st.caption("Parameters")
         st.code(tool_call.parameters)
@@ -608,7 +627,7 @@ def generate_assistant_message():
                         ),
                     )
                     _s.chat.messages.extend([tool_call, result])
-                    render_tool_call(tool_call, result)
+                    _render_tool_call(tool_call, result)
                 except ValueError as ex:
                     logger.error("Error running tool:", ex)
 
