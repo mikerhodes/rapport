@@ -2,13 +2,15 @@
 # dependencies = [
 #   "fastmcp",
 #   "httpx",
-#   "markdownify"
+#   "markdownify",
+#   "beautifulsoup4"
 # ]
 # ///
 
 from fastmcp import FastMCP
 import httpx
-from markdownify import markdownify
+from markdownify import MarkdownConverter
+from bs4 import BeautifulSoup
 
 # Create MCP server instance
 server = FastMCP(name="addserver")
@@ -29,8 +31,35 @@ def download_url(url: str) -> str:
     response = httpx.get(url)
     response.raise_for_status()  # Raise an error for bad responses
 
+    # Super-basic cleanup before passing to markdownify
+    simple_unsafe_tags = [
+        # Script and style tags (potential XSS risks)
+        "script",
+        "style",
+        # Embedded content that could be problematic
+        "iframe",
+        "object",
+        "embed",
+        "applet",
+        # Forms and input elements
+        "form",
+        "input",
+        "button",
+        "select",
+        "textarea",
+        # Potentially dangerous event handlers
+        "meta",  # could contain refresh or redirect
+    ]
+    soup = BeautifulSoup(response.text, "html.parser")
+    for tag in simple_unsafe_tags:
+        for element in soup.find_all(tag):
+            element.decompose()
+
     # Convert HTML to markdown
-    markdown_content = markdownify(response.text, heading_style="ATX")
+
+    markdown_content = MarkdownConverter(heading_style="ATX").convert_soup(
+        soup
+    )
 
     return markdown_content
 
