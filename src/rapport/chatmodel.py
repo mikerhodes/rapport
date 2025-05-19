@@ -5,8 +5,10 @@ Trying to keep this indepdent from streamlit.
 """
 
 from datetime import datetime
+from importlib import resources
 from pathlib import Path
-from typing import Union, List, Optional, Literal, Annotated
+from typing import Annotated, List, Literal, Optional, Union
+
 from pydantic import BaseModel, Field
 
 from rapport.appconfig import ConfigStore
@@ -108,8 +110,7 @@ def new_chat(available_models: List[str], config_store: ConfigStore) -> Chat:
     )
 
 
-prompt_path = Path(__file__).parent / "systemprompt.md"
-with open(prompt_path, "r") as file:
+with resources.open_text("rapport", "systemprompt.md") as file:
     default_system_prompt = file.read()
 
 
