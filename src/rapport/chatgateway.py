@@ -541,6 +541,8 @@ class AnthropicAdaptor(ChatAdaptor):
         # For now we hardcode Claude models we want to use
         # while we firm up how ChatGateway should work.
         self.models = [
+            "claude-opus-4-20250514",
+            "claude-sonnet-4-20250514",
             "claude-3-7-sonnet-latest",
             "claude-3-5-sonnet-latest",
             "claude-3-5-haiku-latest",
