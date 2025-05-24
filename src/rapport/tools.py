@@ -8,7 +8,6 @@ from fastmcp.client import StdioTransport
 import httpx
 from anthropic.types import ToolUnionParam
 from fastmcp import Client
-from mcp import LoggingLevel
 
 from rapport.appconfig import ConfigStore, StdioMCPServer, URLMCPServer
 

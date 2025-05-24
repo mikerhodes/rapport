@@ -1,8 +1,11 @@
 import json
+import logging
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class URLMCPServer(BaseModel):
@@ -58,4 +61,14 @@ class ConfigStore:
                 data = json.load(f)
                 return Config(**data)
         except FileNotFoundError:
+            logger.warning(
+                "Couldn't load config from %s; loading default", self._path
+            )
             return Config()  # Return default config if file doesn't exist
+
+
+base_dir = Path.home() / ".config" / "rapport"
+base_dir.mkdir(exist_ok=True)
+
+
+store = ConfigStore(base_dir / "config.json")

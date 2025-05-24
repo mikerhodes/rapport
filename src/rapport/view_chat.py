@@ -5,7 +5,7 @@ import subprocess
 import traceback
 from io import StringIO
 from pathlib import Path
-from typing import Iterable, Iterator, List, Optional, cast
+from typing import Iterable, List, Optional, cast
 
 import more_itertools
 from pandas.core.base import textwrap
@@ -14,9 +14,10 @@ from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
 
 from rapport import consts, tools
-from rapport.appconfig import ConfigStore
-from rapport.chatgateway import ChatGateway, FinishReason
-from rapport.chathistory import ChatHistoryManager
+from rapport import appconfig
+from rapport import chathistory
+from rapport import chatgateway
+from rapport.chatgateway import FinishReason
 from rapport.chatmodel import (
     PAGE_HISTORY,
     AssistantMessage,
@@ -27,7 +28,6 @@ from rapport.chatmodel import (
     ToolResultMessage,
     UserMessage,
     new_chat,
-    Message,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,13 +36,10 @@ logger = logging.getLogger(__name__)
 class State:
     chat: Chat
     user_prompt: ChatInputValue
-    chat_gateway: ChatGateway
     generate_assistant: bool
     model: str
     models: List[str]
-    history_manager: ChatHistoryManager
     finish_reason: FinishReason
-    config_store: ConfigStore
     load_chat_with_id: Optional[str]
     outstanding_tool_calls: List[ToolCallMessage]
 
@@ -59,14 +56,14 @@ _s = cast(State, st.session_state)
 def _handle_new_chat():
     """Clears the existing chat session"""
     del _s.chat
-    _s.chat = new_chat(_s.models, _s.config_store)
+    _s.chat = new_chat(_s.models, appconfig.store)
     _s.model = _s.chat.model
 
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
     # cg = cast(ChatGateway, st.session_state["chat_gateway"])
-    response = _s.chat_gateway.chat(
+    response = chatgateway.gateway.chat(
         model=_s.chat.model,
         messages=_s.chat.messages,
         tools=tools.registry.get_enabled_tools(),
@@ -183,7 +180,7 @@ def _insert_file_chat_message(data, fname, fext: str):
 
 
 def _insert_image_chat_message(data: bytes, fname: str):
-    fpath = _s.history_manager.import_image(_s.chat.id, fname, data)
+    fpath = chathistory.store.import_image(_s.chat.id, fname, data)
     _s.chat.messages.append(IncludedImage(name=fname, path=fpath))
 
 
@@ -191,9 +188,9 @@ def _handle_change_model():
     model = _s.model
     _s.chat.model = model
 
-    c = _s.config_store.load_config()
+    c = appconfig.store.load_config()
     c.last_used_model = model
-    _s.config_store.save_config(c)
+    appconfig.store.save_config(c)
 
 
 def post_process_chunk(s: str) -> str:
@@ -247,7 +244,7 @@ def save_current_chat():
     """Save the current chat session, writing to export file if set too."""
     if len(_s.chat.messages) > 1:  # More than just system message
         _s.chat.title = generate_chat_title(_s.chat)
-        _s.history_manager.save_chat(_s.chat)
+        chathistory.store.save_chat(_s.chat)
         if p := _s.chat.export_location:
             with open(p, "w") as f:
                 f.write(_chat_as_markdown())
@@ -255,7 +252,7 @@ def save_current_chat():
 
 def _handle_load_chat(chat_id):
     """Load a chat from history"""
-    chat = _s.history_manager.get_chat(chat_id)
+    chat = chathistory.store.get_chat(chat_id)
     if chat:
         _s.chat = chat
         _s.model = chat.model
@@ -263,7 +260,7 @@ def _handle_load_chat(chat_id):
 
 
 def _handle_obsidian_download():
-    p = _s.config_store.load_config().obsidian_directory
+    p = appconfig.store.load_config().obsidian_directory
     if p:
         p = Path(p) / f"{_s.chat.title}-{_s.chat.id}.md"
         _s.chat.export_location = p
@@ -381,7 +378,7 @@ def init_state():
     if "outstanding_tool_calls" not in st.session_state:
         _s.outstanding_tool_calls = []
 
-    _s.models = _s.chat_gateway.list()
+    _s.models = chatgateway.gateway.list()
     if not _s.models:
         raise Exception(
             "No models available; run ollama or add Anthropic/watsonx credential environment variables."
@@ -397,7 +394,7 @@ def init_state():
     # Start a new chat if there isn't one active.
     # "New Chat" is implemented as `del st.session_state["chat"]`
     if "chat" not in st.session_state:
-        _s.chat = new_chat(_s.models, _s.config_store)
+        _s.chat = new_chat(_s.models, appconfig.store)
     _s.model = _s.chat.model
 
 
@@ -438,7 +435,7 @@ def render_sidebar():
                     use_container_width=True,
                 )
                 obsidian_av = (
-                    _s.config_store.load_config().obsidian_directory
+                    appconfig.store.load_config().obsidian_directory
                     is not None
                 )
                 st.button(
@@ -471,7 +468,7 @@ def render_sidebar():
 
         # Display recent chats
         st.markdown("## Recent Chats")
-        recent_chats = _s.history_manager.get_recent_chats(limit=2)
+        recent_chats = chathistory.store.get_recent_chats(limit=2)
 
         for chat in recent_chats:
             # Highlight current chat
@@ -523,7 +520,7 @@ def _render_user_message_block(
                     with st.expander(f"Included `{m.name}` in chat."):
                         st.markdown(f"```{m.ext}\n{m.data}\n```")
                 case "IncludedImage":
-                    if _s.chat_gateway.supports_images(_s.model):
+                    if chatgateway.gateway.supports_images(_s.model):
                         # make the image a bit smaller
                         a, _ = st.columns([1, 2])
                         with a:

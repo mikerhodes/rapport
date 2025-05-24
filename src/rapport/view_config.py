@@ -2,13 +2,12 @@ import streamlit as st
 from pydantic import TypeAdapter, ValidationError
 
 from rapport import tools
-from rapport.appconfig import Config, ConfigStore, MCPServerList
+from rapport import appconfig
 
 st.title("Settings")
 
 # Get config store from session state
-config_store: ConfigStore = st.session_state["config_store"]
-config = config_store.load_config()
+config = appconfig.store.load_config()
 
 # Create form for editing settings
 with st.form("settings_form"):
@@ -72,7 +71,7 @@ with st.form("settings_form"):
         with st.expander("Currently loaded tools"):
             for t in tools.registry.get_enabled_tools():
                 st.markdown(f"`{t.name}` from `{t.server}`")
-        ta = TypeAdapter(MCPServerList)
+        ta = TypeAdapter(appconfig.MCPServerList)
         mcp_str = ta.dump_json(config.mcp_servers, indent=4).decode("utf-8")
         mcp_servers = st.text_area(
             "MCP JSON configuration",
@@ -88,7 +87,7 @@ with st.form("settings_form"):
     if submitted:
         mcp = {}
         try:
-            ta = TypeAdapter(MCPServerList)
+            ta = TypeAdapter(appconfig.MCPServerList)
             mcp = ta.validate_json(mcp_servers if mcp_servers else "{}")
         except ValidationError as ex:
             # logger.error("Error saving configuration: %s", ex)
@@ -96,7 +95,7 @@ with st.form("settings_form"):
 
         # Update config with new values
         if mcp:
-            new_config = Config(
+            new_config = appconfig.Config(
                 preferred_model=preferred_model if preferred_model else None,
                 obsidian_directory=obsidian_directory
                 if obsidian_directory
@@ -109,7 +108,7 @@ with st.form("settings_form"):
             )
 
             # Save to disk
-            config_store.save_config(new_config)
+            appconfig.store.save_config(new_config)
             st.success("Settings saved successfully!")
 
 # Add some helpful information

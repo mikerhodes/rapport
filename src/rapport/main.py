@@ -15,8 +15,7 @@ So we:
 1. Create this file as an entrypoint (see tool.uv in pyproject.toml)
 2. This file determines the path to the entrypoint, which sits next
    to it on the file system.
-3. We either use exec* to replace this process with a new python
-   process, or use runpy to execute streamlit.
+3. We the use runpy to execute streamlit.
 
 When I first tried runpy I got this error:
 
@@ -41,21 +40,13 @@ package = true
 rapport = "main:run_rapport"
 """
 
-# import os
-from pathlib import Path
 import runpy
 import sys
+from pathlib import Path
 
+from rapport import appconfig, tools
 
-# def run_with_exec() -> None:
-#     p = Path(__file__).parent / "entrypoint.py"
-#     os.execlp(
-#         "python3",
-#         "python3",
-#         "-mstreamlit",
-#         "run",
-#         str(p),
-#     )
+tools.registry.initialise_tools(appconfig.store)
 
 
 def run_with_runpy() -> None:

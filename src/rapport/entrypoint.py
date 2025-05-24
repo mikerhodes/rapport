@@ -1,13 +1,10 @@
 import logging
 from importlib import resources
-from pathlib import Path
 
 import streamlit as st
 
 from rapport import tools
-from rapport.appconfig import ConfigStore
-from rapport.chatgateway import ChatGateway
-from rapport.chathistory import ChatHistoryManager
+from rapport import appconfig
 from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 
 logging.basicConfig(
@@ -24,10 +21,6 @@ st.set_page_config(
     layout="centered",
 )
 st.set_option("client.toolbarMode", "minimal")
-
-
-base_dir = Path.home() / ".config" / "rapport"
-base_dir.mkdir(exist_ok=True)
 
 
 # Callbacks use switch_to_page to do navigation,
@@ -63,32 +56,5 @@ pg = st.navigation(
     ]
 )
 
-
-# with show_spinner=True, often get ghosted components because streamlit
-# inserts a spinner element into the tree.
-@st.cache_resource(show_spinner=False)
-def gateway():
-    print("Init chat gateway")
-    return ChatGateway()
-
-
-@st.cache_resource(show_spinner=False)
-def history_store():
-    return ChatHistoryManager(base_dir)
-
-
-@st.cache_resource(show_spinner=False)
-def config_store():
-    return ConfigStore(base_dir / "config.json")
-
-
-if "config_store" not in st.session_state:
-    st.session_state["config_store"] = config_store()
-if "history_manager" not in st.session_state:
-    st.session_state["history_manager"] = history_store()
-if "chat_gateway" not in st.session_state:
-    st.session_state["chat_gateway"] = gateway()
-
-tools.registry.initialise_tools(st.session_state["config_store"])
 
 pg.run()

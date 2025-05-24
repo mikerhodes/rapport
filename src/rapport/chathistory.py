@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 from PIL import Image
 from PIL.Image import Resampling
 
+from rapport import appconfig
 from rapport.chatmodel import (
     Chat,
 )
@@ -15,7 +16,7 @@ from rapport.chatmodel import (
 logger = logging.getLogger(__name__)
 
 
-class ChatHistoryManager:
+class ChatHistoryStore:
     def __init__(self, base_dir: Path):
         # Ensure the .assistant directory exists
         self.chats_dir = base_dir / "chats"
@@ -190,3 +191,6 @@ class ChatHistoryManager:
         with open(fpath, "wb") as img_file:
             img_file.write(data_resized.getvalue())
         return fpath
+
+
+store = ChatHistoryStore(appconfig.base_dir)
