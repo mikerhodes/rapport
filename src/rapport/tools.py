@@ -8,6 +8,7 @@ from fastmcp.client import StdioTransport
 import httpx
 from anthropic.types import ToolUnionParam
 from fastmcp import Client
+from mcp import LoggingLevel
 
 from rapport.appconfig import ConfigStore, StdioMCPServer, URLMCPServer
 
@@ -58,7 +59,9 @@ class ToolRegistry:
     # Shutting down, we'd send None on the queue perhaps.
     # See Claude chat.
 
-    async def _get_client(self, server: URLMCPServer | StdioMCPServer):
+    async def _get_client(
+        self, server: URLMCPServer | StdioMCPServer
+    ) -> Client:
         async with self._client_cache_lock:
             if server.id not in self._client_cache:
                 logger.debug("Creating Client for %s", server)
@@ -69,46 +72,67 @@ class ToolRegistry:
                         self._client_cache[server.id] = Client(
                             StdioTransport(server.command, server.args)
                         )
+                logger.debug("Created Client for %s", server)
             client = self._client_cache[server.id]
+        logger.debug("Returning client %s for %s", client, server)
         return client
 
-    async def _list_tools(self, server: URLMCPServer | StdioMCPServer):
+    async def _list_tools(
+        self, server: URLMCPServer | StdioMCPServer
+    ) -> List[Any]:
         client = await self._get_client(server)
 
-        # Connection is established here
-        async with client:
-            logger.debug(f"Client connected: {client.is_connected()}")
+        try:
+            logger.debug("Connecting to %s", server)
+            async with client:
+                logger.debug(f"Client connected: {client.is_connected()}")
 
-            # Make MCP calls within the context
-            tools = await client.list_tools()
+                # Make MCP calls within the context
+                tools = await client.list_tools()
+            logger.debug("Completed _list_tools: %s", server)
+            return tools
+        except ProcessLookupError as ex:
+            logger.error("Error calling MCP server: %s", ex)
+            return []
+        except Exception as ex:
+            logger.error("Error calling MCP server: %s", ex)
+            return []
 
-        return tools
-
-    async def _run_tool(self, tool: Tool, params: Dict[str, Any]):
+    async def _run_tool(self, tool: Tool, params: Dict[str, Any]) -> str:
         client = await self._get_client(tool.server)
         result = None
 
-        async with client:
-            logger.debug(f"Client connected: {client.is_connected()}")
+        try:
+            async with client:
+                logger.debug(f"Client connected: {client.is_connected()}")
 
-            # Make MCP calls within the context
-            tools = await client.list_tools()
+                # Make MCP calls within the context
+                tools = await client.list_tools()
 
-            if any(t.name == tool.name for t in tools):
-                result = await client.call_tool(tool.name, params)
+                if any(t.name == tool.name for t in tools):
+                    result = await client.call_tool(tool.name, params)
 
-        if result is not None:
-            return "\n".join([x.text for x in result if x.type == "text"])
+            if result is not None:
+                return "\n".join(
+                    [x.text for x in result if x.type == "text"]
+                )
+            else:
+                return ""
+        except ProcessLookupError as ex:
+            logger.error("Error calling MCP server: %s", ex)
+            return ""
 
     def _get_available_tools(
         self, s: URLMCPServer | StdioMCPServer
     ) -> List[Tool]:
         """Return all available tools"""
+        logger.debug("Starting _list_tools: %s", s)
         try:
             tools = asyncio.run(self._list_tools(s))
         except httpx.HTTPError as ex:
             logger.warning("MCP server %s unreachable: %s", s, ex)
             tools = []
+        logger.debug("Completed _list_tools: %s", s)
 
         return [
             Tool(
@@ -130,6 +154,7 @@ class ToolRegistry:
 
             # Don't enable any tools if there are duplicate names
             available_tools = self._get_available_tools(s)
+            logger.debug("got available_tools for: %s", s)
             for n in [x.name for x in available_tools]:
                 if n in seen_tools:
                     logger.error(

@@ -10,7 +10,10 @@ from rapport.chatgateway import ChatGateway
 from rapport.chathistory import ChatHistoryManager
 from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s [%(name)s %(funcName)s] %(message)s",
+)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 st.set_page_config(
