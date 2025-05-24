@@ -1,20 +1,23 @@
 import logging
+from importlib import resources
 from pathlib import Path
 
 import streamlit as st
 
 from rapport import tools
-from rapport.chathistory import ChatHistoryManager
-from rapport.chatgateway import ChatGateway
-from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 from rapport.appconfig import ConfigStore
+from rapport.chatgateway import ChatGateway
+from rapport.chathistory import ChatHistoryManager
+from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 st.set_page_config(
     page_title="Rapport",
-    page_icon="images/rapport-favicon.png",
+    page_icon=(
+        resources.files("rapport.images") / "rapport-favicon.png"
+    ).read_bytes(),
     layout="centered",
 )
 st.set_option("client.toolbarMode", "minimal")
@@ -32,9 +35,13 @@ if sp:
     st.switch_page(sp)
 
 st.logo(
-    image="images/rapport-logo.png",
+    image=(
+        resources.files("rapport.images") / "rapport-logo.png"
+    ).read_bytes(),
     size="large",
-    icon_image="images/rapport-logo.png",
+    icon_image=(
+        resources.files("rapport.images") / "rapport-logo.png"
+    ).read_bytes(),
 )
 st.html("""
   <style>
