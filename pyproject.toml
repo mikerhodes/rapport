@@ -1,12 +1,12 @@
 [project]
 name = "rapport"
-version = "0.23.0"
+version = "0.24.0"
 description = "A locally hosted chatbot supporting several providers"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.46.0",
-    "fastmcp==2.5.1",
+    "fastmcp>=2.5.1",
     "ibm-watsonx-ai>=1.2.9",
     "more-itertools>=10.7.0",
     "ollama>=0.4.7",
