@@ -13,10 +13,7 @@ import streamlit as st
 from pandas.core.frame import itertools
 from streamlit.elements.widgets.chat import ChatInputValue
 
-from rapport import consts, tools
-from rapport import appconfig
-from rapport import chathistory
-from rapport import chatgateway
+from rapport import appglobals, consts
 from rapport.chatgateway import FinishReason
 from rapport.chatmodel import (
     PAGE_HISTORY,
@@ -56,17 +53,17 @@ _s = cast(State, st.session_state)
 def _handle_new_chat():
     """Clears the existing chat session"""
     del _s.chat
-    _s.chat = new_chat(_s.models, appconfig.store)
+    _s.chat = new_chat(_s.models, appglobals.configstore)
     _s.model = _s.chat.model
 
 
 def stream_model_response():
     """Returns a generator that yields chunks of the models respose"""
     # cg = cast(ChatGateway, st.session_state["chat_gateway"])
-    response = chatgateway.gateway.chat(
+    response = appglobals.chatgateway.chat(
         model=_s.chat.model,
         messages=_s.chat.messages,
-        tools=tools.registry.get_enabled_tools(),
+        tools=appglobals.toolregistry.get_enabled_tools(),
     )
 
     # chunkier chunks so we don't force redraw too often, and we can
@@ -180,7 +177,7 @@ def _insert_file_chat_message(data, fname, fext: str):
 
 
 def _insert_image_chat_message(data: bytes, fname: str):
-    fpath = chathistory.store.import_image(_s.chat.id, fname, data)
+    fpath = appglobals.chatstore.import_image(_s.chat.id, fname, data)
     _s.chat.messages.append(IncludedImage(name=fname, path=fpath))
 
 
@@ -188,9 +185,9 @@ def _handle_change_model():
     model = _s.model
     _s.chat.model = model
 
-    c = appconfig.store.load_config()
+    c = appglobals.configstore.load_config()
     c.last_used_model = model
-    appconfig.store.save_config(c)
+    appglobals.configstore.save_config(c)
 
 
 def post_process_chunk(s: str) -> str:
@@ -244,7 +241,7 @@ def save_current_chat():
     """Save the current chat session, writing to export file if set too."""
     if len(_s.chat.messages) > 1:  # More than just system message
         _s.chat.title = generate_chat_title(_s.chat)
-        chathistory.store.save_chat(_s.chat)
+        appglobals.chatstore.save_chat(_s.chat)
         if p := _s.chat.export_location:
             with open(p, "w") as f:
                 f.write(_chat_as_markdown())
@@ -252,7 +249,7 @@ def save_current_chat():
 
 def _handle_load_chat(chat_id):
     """Load a chat from history"""
-    chat = chathistory.store.get_chat(chat_id)
+    chat = appglobals.chatstore.get_chat(chat_id)
     if chat:
         _s.chat = chat
         _s.model = chat.model
@@ -260,7 +257,7 @@ def _handle_load_chat(chat_id):
 
 
 def _handle_obsidian_download():
-    p = appconfig.store.load_config().obsidian_directory
+    p = appglobals.configstore.load_config().obsidian_directory
     if p:
         p = Path(p) / f"{_s.chat.title}-{_s.chat.id}.md"
         _s.chat.export_location = p
@@ -378,7 +375,7 @@ def init_state():
     if "outstanding_tool_calls" not in st.session_state:
         _s.outstanding_tool_calls = []
 
-    _s.models = chatgateway.gateway.list()
+    _s.models = appglobals.chatgateway.list()
     if not _s.models:
         raise Exception(
             "No models available; run ollama or add Anthropic/watsonx credential environment variables."
@@ -394,7 +391,7 @@ def init_state():
     # Start a new chat if there isn't one active.
     # "New Chat" is implemented as `del st.session_state["chat"]`
     if "chat" not in st.session_state:
-        _s.chat = new_chat(_s.models, appconfig.store)
+        _s.chat = new_chat(_s.models, appglobals.configstore)
     _s.model = _s.chat.model
 
 
@@ -435,7 +432,7 @@ def render_sidebar():
                     use_container_width=True,
                 )
                 obsidian_av = (
-                    appconfig.store.load_config().obsidian_directory
+                    appglobals.configstore.load_config().obsidian_directory
                     is not None
                 )
                 st.button(
@@ -468,7 +465,7 @@ def render_sidebar():
 
         # Display recent chats
         st.markdown("## Recent Chats")
-        recent_chats = chathistory.store.get_recent_chats(limit=2)
+        recent_chats = appglobals.chatstore.get_recent_chats(limit=2)
 
         for chat in recent_chats:
             # Highlight current chat
@@ -520,7 +517,7 @@ def _render_user_message_block(
                     with st.expander(f"Included `{m.name}` in chat."):
                         st.markdown(f"```{m.ext}\n{m.data}\n```")
                 case "IncludedImage":
-                    if chatgateway.gateway.supports_images(_s.model):
+                    if appglobals.chatgateway.supports_images(_s.model):
                         # make the image a bit smaller
                         a, _ = st.columns([1, 2])
                         with a:
@@ -618,7 +615,7 @@ def generate_assistant_message():
                     result = ToolResultMessage(
                         id=tool_call.id,
                         name=tool_call.name,
-                        result=tools.registry.execute_tool(
+                        result=appglobals.toolregistry.execute_tool(
                             tool_call.name,
                             tool_call.parameters,
                         ),

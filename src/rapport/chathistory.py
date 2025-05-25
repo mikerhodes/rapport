@@ -8,7 +8,6 @@ from typing import Dict, List, Optional
 from PIL import Image
 from PIL.Image import Resampling
 
-from rapport import appconfig
 from rapport.chatmodel import (
     Chat,
 )
@@ -191,6 +190,3 @@ class ChatHistoryStore:
         with open(fpath, "wb") as img_file:
             img_file.write(data_resized.getvalue())
         return fpath
-
-
-store = ChatHistoryStore(appconfig.base_dir)

@@ -44,9 +44,9 @@ import runpy
 import sys
 from pathlib import Path
 
-from rapport import appconfig, tools
+from rapport import appglobals
 
-tools.registry.initialise_tools(appconfig.store)
+appglobals.toolregistry.initialise_tools(appglobals.configstore)
 
 
 def run_with_runpy() -> None:

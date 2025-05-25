@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import streamlit as st
 
-from rapport import chathistory
+from rapport import appglobals
 from rapport.chatmodel import PAGE_CHAT
 
 #
@@ -13,7 +13,7 @@ from rapport.chatmodel import PAGE_CHAT
 def delete_chat(chat_id):
     """Delete a chat, starting a new chat if the deleted chat
     is currently the active chat"""
-    chathistory.store.delete_chat(chat_id)
+    appglobals.chatstore.delete_chat(chat_id)
     if (
         st.session_state.get("chat")
         and chat_id == st.session_state["chat"].id
@@ -33,7 +33,7 @@ def edit_chat_title(chat_id, new_title):
         # Don't allow empty titles
         return
 
-    hm = chathistory.store
+    hm = appglobals.chatstore
     chat = hm.get_chat(chat_id)
     if chat:
         chat.title = new_title
@@ -80,7 +80,7 @@ def main():
         """)
     st.title("History")
 
-    recent_chats = chathistory.store.get_recent_chats(limit=100)
+    recent_chats = appglobals.chatstore.get_recent_chats(limit=100)
     show_chat_history(recent_chats)
 
 

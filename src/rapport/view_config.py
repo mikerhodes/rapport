@@ -1,13 +1,13 @@
 import streamlit as st
 from pydantic import TypeAdapter, ValidationError
 
-from rapport import tools
+from rapport import appglobals
 from rapport import appconfig
 
 st.title("Settings")
 
 # Get config store from session state
-config = appconfig.store.load_config()
+config = appglobals.configstore.load_config()
 
 # Create form for editing settings
 with st.form("settings_form"):
@@ -69,7 +69,7 @@ with st.form("settings_form"):
                 }
             }""")
         with st.expander("Currently loaded tools"):
-            for t in tools.registry.get_enabled_tools():
+            for t in appglobals.toolregistry.get_enabled_tools():
                 st.markdown(f"`{t.name}` from `{t.server}`")
         ta = TypeAdapter(appconfig.MCPServerList)
         mcp_str = ta.dump_json(config.mcp_servers, indent=4).decode("utf-8")
@@ -108,7 +108,7 @@ with st.form("settings_form"):
             )
 
             # Save to disk
-            appconfig.store.save_config(new_config)
+            appglobals.configstore.save_config(new_config)
             st.success("Settings saved successfully!")
 
 # Add some helpful information

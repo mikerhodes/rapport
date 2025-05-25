@@ -3,8 +3,6 @@ from importlib import resources
 
 import streamlit as st
 
-from rapport import tools
-from rapport import appconfig
 from rapport.chatmodel import PAGE_CHAT, PAGE_CONFIG, PAGE_HELP, PAGE_HISTORY
 
 logging.basicConfig(

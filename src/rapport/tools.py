@@ -216,6 +216,3 @@ class ToolRegistry:
         # validate correct params?
         result = asyncio.run(self._run_tool(tool, params))
         return result or ""
-
-
-registry = ToolRegistry()

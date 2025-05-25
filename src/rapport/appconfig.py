@@ -65,10 +65,3 @@ class ConfigStore:
                 "Couldn't load config from %s; loading default", self._path
             )
             return Config()  # Return default config if file doesn't exist
-
-
-base_dir = Path.home() / ".config" / "rapport"
-base_dir.mkdir(exist_ok=True)
-
-
-store = ConfigStore(base_dir / "config.json")
