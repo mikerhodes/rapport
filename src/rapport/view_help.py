@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 import streamlit as st
 
 help_content = """
@@ -19,6 +21,12 @@ will intercept the command instead of sending it to the model.
     ```
 """
 
+
 st.title("Help")
-st.header("Slash commands")
-st.markdown(help_content)
+t1, t2 = st.columns([3, 1])
+with t1:
+    st.header("Slash commands")
+    st.markdown(help_content)
+with t2:
+    st.subheader("Debug info")
+    st.markdown(f"Rapport version: `{version('rapport')}`.")
