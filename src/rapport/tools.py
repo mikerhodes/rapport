@@ -44,7 +44,6 @@ class Tool:
 class ToolRegistry:
     def __init__(self):
         self._client_cache: Dict[str, Any] = {}
-        self._client_cache_lock = asyncio.Lock()
         self.tools: Dict[str, Tool] = {}  # Tool.name : Tool
         self._tools_lock = threading.Lock()
         self._initialised = False
@@ -58,28 +57,28 @@ class ToolRegistry:
     # Shutting down, we'd send None on the queue perhaps.
     # See Claude chat.
 
-    async def _get_client(
+    def _get_client_sync(
         self, server: URLMCPServer | StdioMCPServer
     ) -> Client:
-        async with self._client_cache_lock:
-            if server.id not in self._client_cache:
-                logger.debug("Creating Client for %s", server)
-                match server:
-                    case URLMCPServer():
-                        self._client_cache[server.id] = Client(server.url)
-                    case StdioMCPServer():
-                        self._client_cache[server.id] = Client(
-                            StdioTransport(server.command, server.args)
-                        )
-                logger.debug("Created Client for %s", server)
-            client = self._client_cache[server.id]
+        if server.id not in self._client_cache:
+            logger.debug("Creating Client for %s", server)
+            match server:
+                case URLMCPServer():
+                    self._client_cache[server.id] = Client(server.url)
+                case StdioMCPServer():
+                    self._client_cache[server.id] = Client(
+                        StdioTransport(server.command, server.args)
+                    )
+            logger.debug("Created Client for %s", server)
+        client = self._client_cache[server.id]
         logger.debug("Returning client %s for %s", client, server)
         return client
 
     async def _list_tools(
         self, server: URLMCPServer | StdioMCPServer
     ) -> List[Any]:
-        client = await self._get_client(server)
+        # client = await self._get_client(server)
+        client = self._client_cache[server.id]
 
         try:
             logger.debug("Connecting to %s", server)
@@ -98,7 +97,8 @@ class ToolRegistry:
             return []
 
     async def _run_tool(self, tool: Tool, params: Dict[str, Any]) -> str:
-        client = await self._get_client(tool.server)
+        # client = await self._get_client(server)
+        client = self._client_cache[tool.server.id]
         result = None
 
         try:
@@ -150,6 +150,8 @@ class ToolRegistry:
         # Find URL where tool is available and allowed
         for n, s in mcp_servers.items():
             logger.debug("Processing MCP server: %s", s)
+
+            self._client_cache[s.id] = self._get_client_sync(s)
 
             # Don't enable any tools if there are duplicate names
             available_tools = self._get_available_tools(s)
