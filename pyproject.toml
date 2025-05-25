@@ -1,6 +1,6 @@
 [project]
 name = "rapport"
-version = "0.21.0"
+version = "0.22.0"
 description = "A locally hosted chatbot supporting several providers"
 readme = "README.md"
 requires-python = ">=3.12"

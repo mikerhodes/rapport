@@ -1,8 +1,9 @@
 import asyncio
+from concurrent.futures import Future
 import logging
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Coroutine, Dict, List, Optional, Callable
 
 from fastmcp.client import StdioTransport
 import httpx
@@ -13,6 +14,34 @@ from rapport.appconfig import ConfigStore, StdioMCPServer, URLMCPServer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+class AsyncWorker:
+    """
+    Create a simple worker thread with its own asyncio.loop so we
+    can safely call async code in a single event loop.
+
+    Later, we can use this loop to set up our Client sessions such
+    that we don't have to create new client sessions for every tool
+    call (and, particularly, re-execute stdio MCP servers).
+    """
+
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self._start_loop, daemon=True)
+        self.thread.start()
+
+    def _start_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    def submit(self, coro: Coroutine) -> Any:
+        future: Future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return future.result()
+
+    def stop(self):
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join()
 
 
 @dataclass
@@ -47,6 +76,7 @@ class ToolRegistry:
         self.tools: Dict[str, Tool] = {}  # Tool.name : Tool
         self._tools_lock = threading.Lock()
         self._initialised = False
+        self.worker = AsyncWorker()
 
     # To create a thing where instead each Client is connected
     # and running, we could use an approach where we have
@@ -127,7 +157,7 @@ class ToolRegistry:
         """Return all available tools"""
         logger.debug("Starting _list_tools: %s", s)
         try:
-            tools = asyncio.run(self._list_tools(s))
+            tools = self.worker.submit(self._list_tools(s))
         except httpx.HTTPError as ex:
             logger.warning("MCP server %s unreachable: %s", s, ex)
             tools = []
@@ -216,5 +246,6 @@ class ToolRegistry:
             raise ValueError(f"Unknown tool: {tool_name}")
 
         # validate correct params?
-        result = asyncio.run(self._run_tool(tool, params))
+
+        result = self.worker.submit(self._run_tool(tool, params))
         return result or ""
