@@ -49,27 +49,30 @@ with st.form("settings_form"):
         st.subheader("MCP Servers")
         with st.expander("JSON configuration examples"):
             st.markdown("""
-            Rapport only supports tools that support a
-            HTTP interface. It uses JSON configuration
-            to add each MCP server to Rapport. You must
-            explicitly list the allowed tools.
+                Rapport supports stdio and HTTP MCP
+                servers. They are configured using JSON
+                objects, as shown below.
 
-            These configuration examples are for the
-            mcphttp.py and mcpstdio.py examples that
-            ship with Rapport.
-            """)
+                :material/warning: Only tools present in
+                `allowed_tools` will
+                be made available to the model.
+
+                These configuration examples are for the
+                mcphttp.py and mcpstdio.py examples that
+                ship with Rapport.
+                """)
             st.caption("Hover to copy to clipboard")
             st.json("""{
-                "addmcp": {
-                    "url": "http://127.0.0.1:9000/mcp/",
-                    "allowed_tools": ["add","mul"]
-                },
-                "mcpstdio": {
-                    "command": "uv",
-                    "args": ["run","mcpstdio.py"],
-                    "allowed_tools": ["download_url"]
-                }
-            }""")
+                    "addmcp": {
+                        "url": "http://127.0.0.1:9000/mcp/",
+                        "allowed_tools": ["add","mul"]
+                    },
+                    "mcpstdio": {
+                        "command": "uv",
+                        "args": ["run","mcpstdio.py"],
+                        "allowed_tools": ["download_url"]
+                    }
+                }""")
         with st.expander("Currently loaded tools"):
             for t in appglobals.toolregistry.get_enabled_tools():
                 st.markdown(f"`{t.name}` from `{t.server}`")
@@ -83,35 +86,43 @@ with st.form("settings_form"):
             height=300,
         )
 
-    # Submit button
-    submitted = st.form_submit_button("Save Settings")
+    b, success = st.columns([1, 4])
 
-    if submitted:
-        mcp = {}
-        try:
-            ta = TypeAdapter(appconfig.MCPServerList)
-            mcp = ta.validate_json(mcp_servers if mcp_servers else "{}")
-        except ValidationError as ex:
-            # logger.error("Error saving configuration: %s", ex)
-            st.error(f"Error validating MCP servers:\n\n{str(ex)}")
+    with b:
+        # Submit button
+        submitted = st.form_submit_button("Save Settings")
 
-        # Update config with new values
-        if mcp:
-            new_config = appconfig.Config(
-                preferred_model=preferred_model if preferred_model else None,
-                obsidian_directory=obsidian_directory
-                if obsidian_directory
-                else None,
-                last_used_model=config.last_used_model,
-                custom_system_prompt=custom_system_prompt
-                if custom_system_prompt
-                else None,
-                mcp_servers=mcp,
-            )
+    with success:
+        if submitted:
+            mcp = {}
+            try:
+                ta = TypeAdapter(appconfig.MCPServerList)
+                mcp = ta.validate_json(mcp_servers if mcp_servers else "{}")
+            except ValidationError as ex:
+                # logger.error("Error saving configuration: %s", ex)
+                print(ex)
+                st.error("Error validating MCP servers")
+                st.code(str(ex), language="txt")
 
-            # Save to disk
-            appglobals.configstore.save_config(new_config)
-            st.success("Settings saved successfully!")
+            # Update config with new values
+            if mcp:
+                new_config = appconfig.Config(
+                    preferred_model=preferred_model
+                    if preferred_model
+                    else None,
+                    obsidian_directory=obsidian_directory
+                    if obsidian_directory
+                    else None,
+                    last_used_model=config.last_used_model,
+                    custom_system_prompt=custom_system_prompt
+                    if custom_system_prompt
+                    else None,
+                    mcp_servers=mcp,
+                )
+
+                # Save to disk
+                appglobals.configstore.save_config(new_config)
+                st.success("Settings saved successfully!")
 
 # Add some helpful information
 with st.expander("Help"):
