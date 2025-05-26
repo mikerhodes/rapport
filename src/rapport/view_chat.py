@@ -575,7 +575,13 @@ def _render_tool_call(tool_call, tool_response):
         st.code(tool_call.parameters)
         if tool_response is not None:
             st.caption("Result")
-            st.code(tool_response.result, height=400)
+            # Show a maximum of about 16 lines
+            # There are about 16 lines rendered into 400 height,
+            # padding is 30px, so 24px per line with a min height
+            # of 1 line is 54.
+            c = len(tool_response.result.splitlines())
+            h = max(54, int(min(c * 24, 400)))
+            st.code(tool_response.result, height=h)
 
 
 def generate_assistant_message():
