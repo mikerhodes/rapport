@@ -127,6 +127,7 @@ def new_chat(available_models: List[str], config_store: ConfigStore) -> Chat:
     )
 
 
+default_system_prompt = ""
 with resources.open_text("rapport", "systemprompt.md") as file:
     default_system_prompt = file.read()
 

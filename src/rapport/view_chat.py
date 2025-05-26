@@ -487,8 +487,7 @@ def render_chat_messages():
         # Use the type discriminator field to determine the message type
         match message.type:
             case "SystemMessage":
-                with st.expander("View system prompt"):
-                    st.markdown(message.message)
+                pass  # see view_config for display of system prompt
             case "UserMessage" | "IncludedFile" | "IncludedImage":
                 _render_user_message_block(message, p)
             case "AssistantMessage" | "ToolCallMessage":

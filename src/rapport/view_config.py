@@ -1,7 +1,7 @@
 import streamlit as st
 from pydantic import TypeAdapter, ValidationError
 
-from rapport import appglobals
+from rapport import appglobals, chatmodel
 from rapport import appconfig
 
 st.title("Settings")
@@ -35,8 +35,10 @@ with st.form("settings_form"):
 
     with tab2:
         st.subheader("Custom system prompt")
+        with st.expander("View default prompt"):
+            st.markdown(chatmodel.default_system_prompt)
         custom_system_prompt = st.text_area(
-            "Details you want the model to know about you:",
+            "Extra custom prompt to inject into system prompt:",
             value=config.custom_system_prompt or "",
             placeholder="Enter things about you (eg, 'I like Python') or customisations to the model's behaviour (eg, 'be sarcastic a lot')",
             height=300,
