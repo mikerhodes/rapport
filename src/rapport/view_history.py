@@ -71,8 +71,7 @@ def handle_edit_dialog(chat_id, chat_title: str):
 def main():
     st.html("""
         <style>
-        div[class*="st-key-chat_chathistory-"]{}
-         button {
+        div[class*="st-key-chat_chathistory_"] button {
             justify-content: left !important;
             text-align: left;
         }

@@ -467,27 +467,38 @@ def render_sidebar():
             _s.models,
             key="model",
             on_change=_handle_change_model,
+            label_visibility="collapsed",
         )
 
         # Display recent chats
-        st.markdown("## Recent Chats")
-        recent_chats = appglobals.chatstore.get_recent_chats(limit=2)
+        st.caption("Recent Chats")
+        recent_chats = appglobals.chatstore.get_recent_chats(limit=4)
+        st.html("""
+            <style>
+            div[class*="st-key-recent_chat_"] button {
+                justify-content: left !important;
+                text-align: left;
+                min-height: initial;
+            }
+            </style>
+            """)
 
         for chat in recent_chats:
             # Highlight current chat
             icon = None
-            if chat["id"] == _s.chat.id:
-                icon = ":material/edit:"
+            is_current_chat = chat["id"] == _s.chat.id
             st.button(
                 " ".join(chat["title"].split()[:6]) + "...",
-                key=f"chat_{chat['id']}",
+                key=f"recent_chat_{chat['id']}",
                 on_click=_handle_load_chat,
                 args=(chat["id"],),
                 use_container_width=True,
                 icon=icon,
+                # type="tertiary",
+                type="secondary" if is_current_chat else "tertiary",
             )
 
-        st.page_link(PAGE_HISTORY, label="More chats ->")
+        st.page_link(PAGE_HISTORY, label="More ->")
 
 
 def render_chat_messages():
@@ -610,7 +621,7 @@ def _render_tool_call(tool_call, tool_response):
 
 
 def generate_assistant_message():
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant"), st.empty(), st.container():
         turns = 20  # limit tool-calling turns for safety
         while turns:
             turns -= 1
