@@ -58,4 +58,7 @@ async def mul(a: int, b: int) -> int:
 if __name__ == "__main__":
     print("Starting MCP server...")
     print("Server running at http://localhost:9000")
+    # We can spit out the JSON by :
+    # t = asyncio.run(server.get_tools())
+    # [x.to_mcp_tool().json() for x in t.values()]
     server.run(transport="streamable-http", host="127.0.0.1", port=9000)
