@@ -106,8 +106,17 @@ def wait_n_and_chain(n, g_original) -> Iterable:
 
 def _handle_regenerate():
     """Regenerate the last assistant response"""
-    # Remove the last assistant message
-    _s.chat.messages = st.session_state["chat"].messages[:-1]
+    # Remove the last assistant messages (can be >1 due to tool calls)
+    i = 0
+    for m in reversed(_s.chat.messages):
+        match m.type:
+            case (
+                "AssistantMessage" | "ToolCallMessage" | "ToolResultMessage"
+            ):
+                i += 1
+            case _:
+                break
+    _s.chat.messages = st.session_state["chat"].messages[:-i]
     _s.generate_assistant = True
 
 
