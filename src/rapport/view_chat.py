@@ -515,10 +515,7 @@ def _render_user_message_block(
                         st.markdown(f"```{m.ext}\n{m.data}\n```")
                 case "IncludedImage":
                     if appglobals.chatgateway.supports_images(_s.model):
-                        # make the image a bit smaller
-                        a, _ = st.columns([1, 2])
-                        with a:
-                            st.image(str(m.path))
+                        _render_image_block(m, p)
                     else:
                         st.warning("Change model to use images.")
             # If no more items in iterable, or it's
@@ -532,6 +529,26 @@ def _render_user_message_block(
                     continue
                 case _:
                     break
+
+
+def _render_image_block(first: IncludedImage, p: more_itertools.peekable):
+    """
+    Render up to three images in columns, advancing the
+    iterator.
+    """
+    cols = st.columns(4)
+    maybe_img = first
+    col_idx = 0
+    while maybe_img.type == "IncludedImage" and col_idx < len(cols):
+        with cols[col_idx]:
+            st.image(str(maybe_img.path))
+        if not p:
+            return
+        maybe_img = next(p)
+        if not maybe_img.type == "IncludedImage":
+            p.prepend(maybe_img)  # put it back and return
+            return
+        col_idx += 1
 
 
 def _render_assistant_message_block(
