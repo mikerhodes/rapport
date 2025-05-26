@@ -624,7 +624,7 @@ def generate_assistant_message():
             except Exception as e:
                 print(e)
                 print(traceback.format_exc())
-                print("The server could not be reached")
+                print("Error calling remote model")
                 st.error(e)
 
             tool_use = len(tool_acc) > 0
