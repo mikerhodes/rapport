@@ -38,7 +38,6 @@ class State:
     models: List[str]
     finish_reason: FinishReason
     load_chat_with_id: Optional[str]
-    outstanding_tool_calls: List[ToolCallMessage]
 
 
 # _s acts as a typed accessor for session state.
@@ -57,7 +56,7 @@ def _handle_new_chat():
     _s.model = _s.chat.model
 
 
-def stream_model_response():
+def stream_model_response(tool_acc: List[ToolCallMessage]):
     """Returns a generator that yields chunks of the models respose"""
     # cg = cast(ChatGateway, st.session_state["chat_gateway"])
     response = appglobals.chatgateway.chat(
@@ -78,7 +77,7 @@ def stream_model_response():
         if chunk.finish_reason is not None:
             _s.finish_reason = chunk.finish_reason
         if chunk.tool_call is not None:
-            _s.outstanding_tool_calls.append(chunk.tool_call)
+            tool_acc.append(chunk.tool_call)
 
         # print(chunk.content)
         chunkier_chunk += chunk.content
@@ -372,8 +371,6 @@ def init_state():
     # Don't generate a chat message until the user has prompted
     if "generate_assistant" not in st.session_state:
         _s.generate_assistant = False
-    if "outstanding_tool_calls" not in st.session_state:
-        _s.outstanding_tool_calls = []
 
     _s.models = appglobals.chatgateway.list()
     if not _s.models:
@@ -587,11 +584,11 @@ def generate_assistant_message():
         while turns:
             turns -= 1
 
+            tool_acc: List[ToolCallMessage] = []
+
             try:
-                # stream_model_response accumulates tool calls
-                # in _s.outstanding_tool_calls
                 with st.spinner("Thinking...", show_time=False):
-                    g = wait_n_and_chain(2, stream_model_response())
+                    g = wait_n_and_chain(2, stream_model_response(tool_acc))
                 m = st.write_stream(g)
 
                 # should be str, might be empty if model immediately
@@ -608,9 +605,9 @@ def generate_assistant_message():
                 print("The server could not be reached")
                 st.error(e)
 
-            tool_use = len(_s.outstanding_tool_calls) > 0
+            tool_use = len(tool_acc) > 0
 
-            for tool_call in _s.outstanding_tool_calls:
+            for tool_call in tool_acc:
                 try:
                     result = ToolResultMessage(
                         id=tool_call.id,
@@ -624,8 +621,6 @@ def generate_assistant_message():
                     _render_tool_call(tool_call, result)
                 except ValueError as ex:
                     logger.error("Error running tool:", ex)
-
-            _s.outstanding_tool_calls.clear()
 
             save_current_chat()
 
