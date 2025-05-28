@@ -86,7 +86,7 @@ class WatsonxAdaptor(ChatAdaptor):
 
         params = {
             "time_limit": 10000,
-            "max_tokens": 20480,
+            "max_tokens": 40960,
         }
         verify = True
         fmodel = waifm.ModelInference(
