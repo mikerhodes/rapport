@@ -52,6 +52,8 @@ class OpenAIAdaptor(ChatAdaptor):
                 "gpt-4.1-nano",
                 "gpt-4o-mini",
                 "gpt-4o",
+                "gpt-o3",
+                "o3-mini-2025-01-31",
             ]
         )
 
