@@ -42,8 +42,12 @@ st.html("""
     [alt=Logo] {
       height: 4rem;
     }
+    [data-testid=stSidebarHeader] {
+      margin-top: 1rem;
+      height: 4rem;
+    }
   </style>
-        """)
+""")
 
 pg = st.navigation(
     [
